@@ -1,0 +1,26 @@
+[project]
+name = "cairn-cli"
+version = "0.1.0"
+description = "Thin CLI for the Cairn local-first file-organization harness: scriptable file ops, a local HTTP API (serve), and the MCP server launcher."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = ["cairn-core"]
+
+[project.optional-dependencies]
+mcp = ["cairn-mcp"]
+dev = ["pytest>=7.4"]
+
+[project.scripts]
+cairn = "cairn_cli.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["cairn_cli"]
+
+[tool.uv.sources]
+cairn-core = { path = "../core", editable = true }
+cairn-mcp = { path = "../mcp-server", editable = true }

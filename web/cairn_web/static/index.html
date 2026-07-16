@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cairn</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header>
+    <div class="brand">Cairn</div>
+    <div class="search">
+      <input id="search" type="search" placeholder="Semantic search…" autocomplete="off" />
+      <div id="results" class="results hidden"></div>
+    </div>
+    <div class="actions">
+      <button id="new-file" title="New file">＋ File</button>
+      <button id="new-folder" title="New folder">＋ Folder</button>
+      <button id="reindex" title="Rebuild embedding index">Reindex</button>
+    </div>
+  </header>
+  <main>
+    <aside id="tree" class="tree"></aside>
+    <section id="pane" class="pane">
+      <div class="empty">Select a file from the tree.</div>
+    </section>
+  </main>
+  <div id="toast" class="toast hidden"></div>
+  <script src="/app.js"></script>
+</body>
+</html>

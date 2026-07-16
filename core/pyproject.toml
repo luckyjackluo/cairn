@@ -1,0 +1,32 @@
+[project]
+name = "cairn-core"
+version = "0.1.0"
+description = "Local-first file-organization engine (the .uni format + file tools). Standard library only."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = []
+
+[project.optional-dependencies]
+# Optional parsers for importing real documents into .uni (docx/pdf/pptx/xlsx/md).
+convert = [
+    "mammoth>=1.5",
+    "python-docx>=0.8.11",
+    "python-pptx>=0.6.21",
+    "pymupdf>=1.23",
+    "openpyxl>=3.1",
+    "markdown>=3.4",
+]
+# Optional embeddings-based retrieval (BYO OpenAI-compatible endpoint).
+embeddings = [
+    "numpy>=1.24",
+    "httpx>=0.24",
+]
+dev = ["pytest>=7.4", "numpy>=1.24"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["cairn_core"]
