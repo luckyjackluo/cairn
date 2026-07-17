@@ -88,6 +88,29 @@ editable `.uni` docs; the originals are kept by default.
   like Ollama or LM Studio); vectors live in a local SQLite index under
   `<workspace>/.cairn/` and never leave your machine.
 
+## Roadmap
+
+Cairn is young. Rough direction, and where help is most welcome:
+
+- **More document faces** — richer frontmatter support (nested metadata, dates),
+  and round-tripping edits back into imported source formats.
+- **Smarter digests** — summaries that use an embedding model when one is
+  configured, and saved views (`.cairn/views/*.md`).
+- **More retrieval backends** — pluggable rerankers; first-class local-model
+  presets (Ollama, LM Studio) beyond the generic OpenAI-compatible path.
+- **Editor/agent integrations** — thin recipes for wiring Cairn into common
+  MCP clients and note-taking setups.
+- **Packaging** — signed releases and a Homebrew formula.
+
+Have a use case that doesn't fit? [Open an issue](https://github.com/luckyjackluo/cairn/issues)
+or start a [discussion](https://github.com/luckyjackluo/cairn/discussions).
+
+## Contributing
+
+Contributions of every size are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md)
+for the project layout, dev setup, and how to add a tool. Good first issues are
+labeled [`good first issue`](https://github.com/luckyjackluo/cairn/labels/good%20first%20issue).
+
 ## Develop
 
 ```bash
