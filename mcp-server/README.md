@@ -1,4 +1,4 @@
-# cairn-mcp
+# cairn-mcp-server
 
 An MCP server that exposes Cairn's local-first file-organization tools to
 **Claude Code, Codex, Cursor, and any MCP client**. Point it at a folder and
@@ -15,19 +15,19 @@ remotely; the server is a local process over your own files.
 ## Install & run
 
 ```bash
-uvx cairn-mcp --workspace ~/Documents/notes
+uvx cairn-mcp-server --workspace ~/Documents/notes
 ```
 
 To import real documents (docx/pdf/pptx/xlsx/md), install the converter extra:
 
 ```bash
-uvx --with "cairn-core[convert]" cairn-mcp --workspace ~/Documents/notes
+uvx --with "cairn-core[convert]" cairn-mcp-server --workspace ~/Documents/notes
 ```
 
 ## Use it in Claude Code
 
 ```bash
-claude mcp add cairn -- uvx cairn-mcp --workspace ~/Documents/notes
+claude mcp add cairn -- uvx cairn-mcp-server --workspace ~/Documents/notes
 ```
 
 Or in any MCP client config:
@@ -37,7 +37,7 @@ Or in any MCP client config:
   "mcpServers": {
     "cairn": {
       "command": "uvx",
-      "args": ["cairn-mcp", "--workspace", "~/Documents/notes"]
+      "args": ["cairn-mcp-server", "--workspace", "~/Documents/notes"]
     }
   }
 }

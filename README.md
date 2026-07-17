@@ -8,7 +8,7 @@ tag, import documents, and semantically retrieve. No account, no cloud, no UI
 required. Your files never leave your machine.
 
 ```bash
-claude mcp add cairn -- uvx cairn-mcp --workspace ~/Documents/notes
+claude mcp add cairn -- uvx cairn-mcp-server --workspace ~/Documents/notes
 ```
 
 Then ask your agent to *"organize this folder and tag everything"* — it will,
@@ -37,7 +37,7 @@ never drift.
 core/          cairn-core — the engine (stdlib only): the .uni document format,
                file operations, tags, retrieval; optional document ingestion
                (docx/pdf/pptx/xlsx/md) and embeddings-based search.
-mcp-server/    cairn-mcp  — MCP server: 21 tools with read-only/destructive
+mcp-server/    cairn-mcp-server  — MCP server: 21 tools with read-only/destructive
                annotations, resources, and prompts.        ← the flagship
 cli/           cairn-cli  — scriptable CLI, a local HTTP API (`serve`),
                and an `mcp` launcher.
@@ -50,8 +50,8 @@ web/           cairn-web  — optional zero-build local web UI
 **In Claude Code / Codex / Cursor (primary):**
 
 ```bash
-claude mcp add cairn -- uvx cairn-mcp --workspace ~/Documents/notes
-# with real-document import: uvx --with "cairn-core[convert]" cairn-mcp ...
+claude mcp add cairn -- uvx cairn-mcp-server --workspace ~/Documents/notes
+# with real-document import: uvx --with "cairn-core[convert]" cairn-mcp-server ...
 ```
 
 The server exposes read-only tools (list, read, search, grep, retrieve) that the

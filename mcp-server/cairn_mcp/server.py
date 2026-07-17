@@ -7,8 +7,8 @@ annotations below), and the chat — so there is nothing of ours to run remotely
 and no UI required.
 
 Run:
-    cairn-mcp --workspace ~/Documents/notes
-    # or set CAIRN_WORKSPACE and run `cairn-mcp`
+    cairn-mcp-server --workspace ~/Documents/notes
+    # or set CAIRN_WORKSPACE and run `cairn-mcp-server`
 """
 
 from __future__ import annotations

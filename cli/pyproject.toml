@@ -8,7 +8,7 @@ license = { text = "MIT" }
 dependencies = ["cairn-core>=0.2.0"]
 
 [project.optional-dependencies]
-mcp = ["cairn-mcp>=0.2.0"]
+mcp = ["cairn-mcp-server>=0.2.0"]
 dev = ["pytest>=7.4"]
 
 [project.scripts]
@@ -23,4 +23,4 @@ packages = ["cairn_cli"]
 
 [tool.uv.sources]
 cairn-core = { path = "../core", editable = true }
-cairn-mcp = { path = "../mcp-server", editable = true }
+cairn-mcp-server = { path = "../mcp-server", editable = true }

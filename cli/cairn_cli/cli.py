@@ -210,10 +210,10 @@ def cmd_mcp(args):
     try:
         from cairn_mcp.server import main as mcp_main
     except ImportError:
-        sys.exit("The MCP server isn't installed. Install it with: uv pip install cairn-mcp")
+        sys.exit("The MCP server isn't installed. Install it with: uv pip install cairn-mcp-server")
     if args.workspace:
         os.environ["CAIRN_WORKSPACE"] = str(_ws(args).root)
-    sys.argv = ["cairn-mcp"]
+    sys.argv = ["cairn-mcp-server"]
     mcp_main()
 
 

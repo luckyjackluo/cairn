@@ -11,7 +11,7 @@ first — most real changes land there and the faces (MCP, CLI, web) follow.
 ```
 core/          cairn-core — the engine (stdlib only): .uni format, file ops,
                tags, frontmatter, query, digest, templates, retrieval.
-mcp-server/    cairn-mcp  — MCP server (the flagship face).
+mcp-server/    cairn-mcp-server  — MCP server (the flagship face).
 cli/           cairn-cli  — scriptable CLI + local HTTP API + mcp launcher.
 web/           cairn-web  — optional zero-build local web UI.
 ```

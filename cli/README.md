@@ -46,7 +46,7 @@ cairn serve            # http://127.0.0.1:4177/api/health
 
 ## Three faces, one core
 
-`cairn` (this CLI), `cairn-mcp` (the MCP server), and the planned web UI
+`cairn` (this CLI), `cairn-mcp-server` (the MCP server), and the planned web UI
 are all thin adapters over `cairn-core`, so they can never drift. Use the
 CLI for scripting, `mcp` inside Claude Code / Codex, and `serve` to back the
 web UI.

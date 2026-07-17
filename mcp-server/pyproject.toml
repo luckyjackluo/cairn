@@ -1,5 +1,5 @@
 [project]
-name = "cairn-mcp"
+name = "cairn-mcp-server"
 version = "0.2.0"
 description = "MCP server exposing Cairn's local-first file-organization tools to Claude Code, Codex, Cursor, and any MCP client."
 readme = "README.md"
@@ -11,7 +11,7 @@ dependencies = [
 ]
 
 [project.scripts]
-cairn-mcp = "cairn_mcp.server:main"
+cairn-mcp-server = "cairn_mcp.server:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=7.4"]
