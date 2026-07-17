@@ -19,6 +19,44 @@ using tools that run locally over your own files.
 
 ---
 
+## Quickstart (2 minutes)
+
+If you use **Claude Code**, setup is one command — the only prerequisite is
+[`uv`](https://docs.astral.sh/uv/), which provides `uvx`:
+
+```bash
+# 1. Install uv if you don't have it (provides uvx)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# 2. Add Cairn to Claude Code, pointed at a folder you want organized
+claude mcp add cairn -- uvx cairn-mcp-server --workspace ~/Documents/notes
+```
+
+Reopen Claude Code and ask:
+
+> *"Organize this folder and tag everything."*
+
+Cairn's tools run locally over your files — reads happen freely, and any
+move/rename/edit asks for confirmation first. The first run auto-downloads the
+package (~5s); no clone, no build, no account.
+
+> [!TIP]
+> Point `--workspace` at a **copy** of some notes for your first run — Cairn can
+> move, rename, and edit files.
+
+**Using Cursor or another MCP client?** Same package, JSON config:
+
+```json
+{ "mcpServers": { "cairn": { "command": "uvx",
+  "args": ["cairn-mcp-server", "--workspace", "~/Documents/notes"] } } }
+```
+
+**Just want to poke at it, no agent?**
+
+```bash
+uvx cairn-cli --workspace ~/Documents/notes tree
+```
+
 ## Why a harness
 
 The agent-harness ecosystem converged on a clear pattern: the model and the
