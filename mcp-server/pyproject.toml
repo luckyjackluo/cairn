@@ -1,13 +1,13 @@
 [project]
 name = "cairn-mcp"
-version = "0.1.0"
+version = "0.2.0"
 description = "MCP server exposing Cairn's local-first file-organization tools to Claude Code, Codex, Cursor, and any MCP client."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 dependencies = [
     "mcp>=1.6.0",
-    "cairn-core",
+    "cairn-core>=0.2.0",
 ]
 
 [project.scripts]
