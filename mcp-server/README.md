@@ -2,8 +2,11 @@
 
 An MCP server that exposes Cairn's local-first file-organization tools to
 **Claude Code, Codex, Cursor, and any MCP client**. Point it at a folder and
-your agent gains file tools: list, read, search, grep, edit, move, tag, and
-retrieve — over the `.uni` document format.
+your agent gains file tools: list, read, search, grep, edit, move, tag, query,
+digest, and retrieve — over the `.uni` document format *and* plain markdown with
+YAML frontmatter.
+
+<!-- mcp-name: io.github.luckyjackluo/cairn -->
 
 This is the flagship, **UI-less** face of the product. The MCP client supplies
 the agent loop, the approval prompts, and the chat. Nothing of ours runs
@@ -46,8 +49,9 @@ Or in any MCP client config:
 |------|------|---------|
 | `list_dir`, `get_file_tree`, `read_detail` | read-only | inspect the workspace |
 | `search_files`, `grep`, `semantic_retrieve` | read-only | find things |
-| `get_file_tags`, `get_tag_tree` | read-only | inspect tags |
-| `create_file`, `create_folder`, `update_file_tags` | write | add content |
+| `find_by_meta`, `digest_workspace` | read-only | exact metadata queries; a token-efficient workspace map |
+| `get_file_tags`, `get_tag_tree`, `list_templates` | read-only | inspect tags; list document templates |
+| `create_file`, `create_folder`, `update_file_tags` | write | add content (`create_file` supports `template`/`fields`) |
 | `import_document`, `import_folder` | write | convert docx/pdf/pptx/csv/xlsx/md → editable `.uni` |
 | `multi_edit`, `rename_item`, `move_item`, `delete_item` | destructive | change/relocate (client confirms) |
 
