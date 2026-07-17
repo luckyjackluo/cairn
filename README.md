@@ -44,12 +44,20 @@ package (~5s); no clone, no build, no account.
 > Point `--workspace` at a **copy** of some notes for your first run — Cairn can
 > move, rename, and edit files.
 
+**Using Codex?** Same one-command flow (then run `/mcp` in a session to confirm):
+
+```bash
+codex mcp add cairn -- uvx cairn-mcp-server --workspace ~/Documents/notes
+```
+
 **Using Cursor or another MCP client?** Same package, JSON config:
 
 ```json
 { "mcpServers": { "cairn": { "command": "uvx",
   "args": ["cairn-mcp-server", "--workspace", "~/Documents/notes"] } } }
 ```
+
+`~` is expanded by Cairn, so `~/Documents/notes` works in the CLI and in config files alike.
 
 **Just want to poke at it, no agent?**
 
