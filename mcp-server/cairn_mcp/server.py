@@ -21,7 +21,17 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 
-from cairn_core import FileError, FileService, Workspace, WorkspaceError, retrieval, tags
+from cairn_core import (
+    FileError,
+    FileService,
+    Workspace,
+    WorkspaceError,
+    digest,
+    query,
+    retrieval,
+    tags,
+    templates,
+)
 
 # --- workspace bootstrap ---------------------------------------------------
 
@@ -63,7 +73,8 @@ def get_file_tree(path: str = "", max_depth: int = 12) -> list[dict]:
 
 @mcp.tool(annotations=READ)
 def read_detail(path: str) -> dict:
-    """Read a file. For .uni docs returns HTML content, flattened text, and tags."""
+    """Read a file. For .uni docs returns HTML content, flattened text, and tags;
+    for text/.md files returns raw text plus any YAML frontmatter tags & metadata."""
     return _guard(FS.read_detail, path)
 
 
@@ -81,7 +92,7 @@ def grep(pattern: str, path: str = "", limit: int = 200) -> list[dict]:
 
 @mcp.tool(annotations=READ)
 def get_file_tags(path: str) -> list[str]:
-    """Return the tags stored in a .uni document."""
+    """Return a document's tags — from a .uni's tags array or a text file's YAML frontmatter."""
     return _guard(tags.get_tags, WS, path)
 
 
@@ -89,6 +100,31 @@ def get_file_tags(path: str) -> list[str]:
 def get_tag_tree() -> dict:
     """Return {tag: [file paths]} aggregated across the workspace."""
     return _guard(tags.get_tag_tree, WS)
+
+
+@mcp.tool(annotations=READ)
+def find_by_meta(filters: dict, path: str = "") -> list[dict]:
+    """Find documents whose metadata matches all `filters` (exact, not fuzzy).
+
+    Reads .uni JSON fields and .md YAML frontmatter alike. Scalar fields match
+    case-insensitively; `tags` (or any list field) matches when every requested
+    value is present. Example: {"status": "to-read", "project": "amazon"}.
+    """
+    return _guard(query.find_by_meta, WS, filters, path)
+
+
+@mcp.tool(annotations=READ)
+def digest_workspace(path: str = "", group_by: str = "folder") -> dict:
+    """Return a token-efficient map of the workspace: one entry (title, date,
+    tags, summary) per document, grouped by `folder`, `tag`, or a metadata field
+    like `status`/`project`. Read this before loading individual files."""
+    return _guard(digest.build_digest, WS, path, group_by)
+
+
+@mcp.tool(annotations=READ)
+def list_templates() -> list[str]:
+    """List available document templates (built-ins + workspace .cairn/templates)."""
+    return _guard(templates.available, WS)
 
 
 @mcp.tool(annotations=READ)
@@ -104,9 +140,15 @@ def semantic_retrieve(query: str, k: int = 5) -> list[dict]:
 # --- additive / modifying tools -------------------------------------------
 
 @mcp.tool(annotations=WRITE)
-def create_file(path: str, name: str, content: str = "") -> dict:
-    """Create a file under `path`. If `name` ends in .uni, wraps content as a .uni doc."""
-    return _guard(FS.create_file, path, name, content)
+def create_file(
+    path: str, name: str, content: str = "", template: str = "", fields: dict | None = None
+) -> dict:
+    """Create a file under `path`. If `name` ends in .uni, wraps content as a .uni doc.
+
+    Pass `template` (e.g. "paper", "note" — see list_templates) with `fields` to
+    stamp out a document with frontmatter pre-filled; `content` is then ignored.
+    """
+    return _guard(FS.create_file, path, name, content, template or None, fields)
 
 
 @mcp.tool(annotations=WRITE)
@@ -117,7 +159,7 @@ def create_folder(path: str, name: str) -> dict:
 
 @mcp.tool(annotations=WRITE)
 def update_file_tags(path: str, tags_list: list[str]) -> dict:
-    """Replace the tags on a .uni document."""
+    """Replace a document's tags — in a .uni's tags array or a text file's YAML frontmatter."""
     return _guard(tags.set_tags, WS, path, tags_list)
 
 

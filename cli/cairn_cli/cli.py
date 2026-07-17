@@ -16,7 +16,17 @@ import os
 import sys
 from typing import Any
 
-from cairn_core import FileError, FileService, Workspace, WorkspaceError, retrieval, tags
+from cairn_core import (
+    FileError,
+    FileService,
+    Workspace,
+    WorkspaceError,
+    digest,
+    query,
+    retrieval,
+    tags,
+    templates,
+)
 
 
 def _ws(args) -> Workspace:
@@ -88,7 +98,20 @@ def cmd_read(args):
 def cmd_create(args):
     content = sys.stdin.read() if args.content == "-" else (args.content or "")
     parent, _, name = args.path.rpartition("/")
-    _emit(FileService(_ws(args)).create_file(parent, name, content), args)
+    fields: dict[str, Any] = {}
+    for pair in args.field or []:
+        key, sep, val = pair.partition("=")
+        if not sep:
+            sys.exit(f"error: --field must be key=value, got {pair!r}")
+        fields[key.strip()] = val.strip()
+    _emit(
+        FileService(_ws(args)).create_file(parent, name, content, args.template or None, fields),
+        args,
+    )
+
+
+def cmd_templates(args):
+    _emit(templates.available(_ws(args)), args)
 
 
 def cmd_mkdir(args):
@@ -140,6 +163,36 @@ def cmd_tags(args):
     _emit(tags.get_tag_tree(_ws(args)), args)
 
 
+def cmd_query(args):
+    filters: dict[str, Any] = {}
+    for pair in args.filters:
+        key, sep, val = pair.partition("=")
+        if not sep:
+            sys.exit(f"error: filter must be key=value, got {pair!r}")
+        filters[key.strip()] = val.strip()
+    _emit(query.find_by_meta(_ws(args), filters, args.path), args)
+
+
+def cmd_digest(args):
+    groups = digest.build_digest(_ws(args), args.path, args.group_by)
+    if args.json:
+        print(json.dumps(groups, ensure_ascii=False, indent=2))
+        return
+    if not groups:
+        print("(empty)")
+        return
+    blocks = []
+    for group, entries in groups.items():
+        lines = [f"## {group}"]
+        for e in entries:
+            date = f"[{e['date']}] " if e.get("date") else ""
+            tagstr = ("  " + " ".join("#" + t for t in e["tags"])) if e.get("tags") else ""
+            summary = f" — {e['summary']}" if e.get("summary") else ""
+            lines.append(f"- {date}**{e['title']}**{summary}{tagstr}")
+        blocks.append("\n".join(lines))
+    print("\n\n".join(blocks))
+
+
 def cmd_retrieve(args):
     _emit(retrieval.semantic_retrieve(_ws(args), args.query, args.k), args)
 
@@ -182,6 +235,9 @@ def build_parser() -> argparse.ArgumentParser:
     sp = add("read", cmd_read, "Print a file's contents"); sp.add_argument("path")
     sp = add("create", cmd_create, "Create a file ('-' content reads stdin)")
     sp.add_argument("path"); sp.add_argument("content", nargs="?", default="")
+    sp.add_argument("--template", "-t", help="Stamp from a template (see `cairn templates`)")
+    sp.add_argument("--field", action="append", metavar="KEY=VALUE", help="Template field (repeatable)")
+    add("templates", cmd_templates, "List available document templates")
     sp = add("mkdir", cmd_mkdir, "Create a folder"); sp.add_argument("path")
     sp = add("mv", cmd_mv, "Move a file/folder into a directory")
     sp.add_argument("path"); sp.add_argument("target_dir")
@@ -199,6 +255,12 @@ def build_parser() -> argparse.ArgumentParser:
     sp = add("tag", cmd_tag, "Get or set tags on a .uni file")
     sp.add_argument("path"); sp.add_argument("tags", nargs="*")
     add("tags", cmd_tags, "Show the workspace tag tree")
+    sp = add("query", cmd_query, "Find docs by metadata, e.g. query status=to-read project=amazon")
+    sp.add_argument("filters", nargs="+", help="key=value filters (matched on .uni fields or .md frontmatter)")
+    sp.add_argument("--path", default="", help="Limit the search to this subdirectory")
+    sp = add("digest", cmd_digest, "Generate a one-line-per-doc map of the workspace")
+    sp.add_argument("path", nargs="?", default="")
+    sp.add_argument("--group-by", default="folder", help="folder | tag | a metadata field (status, project, ...)")
     sp = add("retrieve", cmd_retrieve, "Find documents relevant to a query")
     sp.add_argument("query"); sp.add_argument("-k", type=int, default=5)
     add("reindex", cmd_reindex, "Build/refresh the embedding index (if configured)")

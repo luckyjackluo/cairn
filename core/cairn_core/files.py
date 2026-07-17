@@ -12,7 +12,7 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from . import convert, uni
+from . import convert, frontmatter, templates, uni
 from .workspace import Workspace
 
 # Extensions we can read as text (subset of the original product's list).
@@ -102,14 +102,33 @@ class FileService:
                 uuid=obj.get("uuid"),
             )
         elif _is_text(p):
-            detail.update(type="text", text=p.read_text(encoding="utf-8", errors="replace"))
+            raw = p.read_text(encoding="utf-8", errors="replace")
+            detail.update(type="text", text=raw)
+            meta, _body = frontmatter.parse(raw)
+            if meta:
+                tags_val = meta.get("tags", [])
+                detail["tags"] = (
+                    [str(t) for t in tags_val]
+                    if isinstance(tags_val, list)
+                    else [str(tags_val)]
+                )
+                detail["metadata"] = {k: v for k, v in meta.items() if k != "tags"}
         else:
             detail.update(type="binary", size=p.stat().st_size)
         return detail
 
     # -- create ------------------------------------------------------------
 
-    def create_file(self, path: str, name: str, content: str = "") -> dict[str, Any]:
+    def create_file(
+        self,
+        path: str,
+        name: str,
+        content: str = "",
+        template: str | None = None,
+        fields: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        if template:
+            content = templates.render(template, fields, self.ws)
         parent = self.ws.resolve(path)
         parent.mkdir(parents=True, exist_ok=True)
         target = self.ws.resolve(f"{self.ws.relpath(parent)}/{name}".lstrip("/"))

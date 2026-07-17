@@ -17,7 +17,7 @@ import struct
 from pathlib import Path
 from typing import Any
 
-from . import uni
+from . import frontmatter, uni
 from .embeddings import Embedder
 from .files import _is_text
 from .workspace import Workspace
@@ -50,7 +50,8 @@ class VectorIndex:
         if uni.is_uni(p):
             obj = uni.read_uni(p)
             return uni.html_to_text(obj.get("content", "")), [str(t) for t in obj.get("tags", [])]
-        return p.read_text(encoding="utf-8", errors="replace"), []
+        text = p.read_text(encoding="utf-8", errors="replace")
+        return text, frontmatter.get_tags(text)
 
     def _current_files(self) -> list[Path]:
         out = []

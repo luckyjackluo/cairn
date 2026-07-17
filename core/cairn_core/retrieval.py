@@ -17,7 +17,7 @@ import re
 from collections import Counter
 from typing import Any
 
-from . import uni
+from . import frontmatter, uni
 from .embeddings import Embedder, get_embedder
 from .files import _is_text
 from .workspace import Workspace
@@ -96,6 +96,7 @@ def _lexical_retrieve(ws: Workspace, query: str, k: int) -> list[dict[str, Any]]
                 tags = [str(t) for t in obj.get("tags", [])]
             elif _is_text(p):
                 body = p.read_text(encoding="utf-8", errors="replace")
+                tags = frontmatter.get_tags(body)
             else:
                 continue
         except (ValueError, OSError):
