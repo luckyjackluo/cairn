@@ -1,6 +1,6 @@
 [project]
 name = "cairn-cli"
-version = "0.2.0"
+version = "0.2.1"
 description = "Thin CLI for the Cairn local-first file-organization harness: scriptable file ops, a local HTTP API (serve), and the MCP server launcher."
 readme = "README.md"
 requires-python = ">=3.10"
