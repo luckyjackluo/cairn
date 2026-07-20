@@ -47,12 +47,50 @@ _BUILTINS: dict[str, str] = {
         "## Why I saved it\n{why}\n\n"
         "## My Notes\n{notes}\n"
     ),
+    # A task is just a note with a lifecycle. Because it's frontmatter-native it
+    # drops straight into find_by_meta / digest_workspace; the task layer
+    # (:mod:`cairn_core.tasks`) adds the due-date sorting and overdue flags on
+    # top. ``status``: todo | doing | done | blocked.
+    "task": (
+        "---\n"
+        "title: {title}\n"
+        "category: task\n"
+        "status: {status}\n"
+        "due: {due}\n"
+        "project: {project}\n"
+        "context: {context}\n"
+        "created: {date}\n"
+        "source: {source}\n"
+        "tags: [{tags}]\n"
+        "---\n\n"
+        "{notes}\n"
+    ),
+    # A shared bill you fronted. ``people`` holds flat ``name:amount:state``
+    # triples so the frontmatter parser can read them and a human can still edit
+    # them by hand; the bill layer (:mod:`cairn_core.bills`) derives the
+    # outstanding balance and the per-person view from there.
+    "bill": (
+        "---\n"
+        "title: {title}\n"
+        "category: bill\n"
+        "place: {place}\n"
+        "date: {date}\n"
+        "total: {total}\n"
+        "currency: {currency}\n"
+        "people: [{people}]\n"
+        "status: {status}\n"
+        "tags: [{tags}]\n"
+        "---\n\n"
+        "{notes}\n"
+    ),
 }
 
 # Per-template default field values (overridden by caller-supplied fields).
 _DEFAULTS: dict[str, dict[str, str]] = {
     "note": {"status": "draft"},
     "paper": {"status": "to-read"},
+    "task": {"status": "todo", "tags": "task"},
+    "bill": {"status": "open", "tags": "bill", "currency": "USD"},
 }
 
 

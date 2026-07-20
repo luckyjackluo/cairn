@@ -7,7 +7,7 @@ server, a CLI, or a web backend are each thin adapters over this package.
 
 from __future__ import annotations
 
-from . import convert, digest, embeddings, frontmatter, query, retrieval, tags, templates, uni
+from . import bills, convert, digest, embeddings, frontmatter, lifecycle, query, reco, retrieval, tags, tasks, templates, uni
 from .files import FileError, FileService
 from .workspace import PathEscapeError, Workspace, WorkspaceError
 
@@ -20,6 +20,10 @@ __all__ = [
     "tags",
     "retrieval",
     "query",
+    "bills",
+    "tasks",
+    "lifecycle",
+    "reco",
     "digest",
     "templates",
     "uni",

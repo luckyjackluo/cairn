@@ -83,7 +83,7 @@ never drift.
 core/          cairn-core — the engine (stdlib only): the .uni document format,
                file operations, tags, retrieval; optional document ingestion
                (docx/pdf/pptx/xlsx/md) and embeddings-based search.
-mcp-server/    cairn-mcp-server  — MCP server: 21 tools with read-only/destructive
+mcp-server/    cairn-mcp-server  — MCP server: 26 tools with read-only/destructive
                annotations, resources, and prompts.        ← the flagship
 cli/           cairn-cli  — scriptable CLI, a local HTTP API (`serve`),
                and an `mcp` launcher.
