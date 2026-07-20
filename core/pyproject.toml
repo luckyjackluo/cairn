@@ -1,6 +1,6 @@
 [project]
 name = "cairn-core"
-version = "0.2.0"
+version = "0.3.0"
 description = "Local-first file-organization engine (the .uni format + file tools). Standard library only."
 readme = "README.md"
 requires-python = ">=3.10"
