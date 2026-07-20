@@ -25,6 +25,7 @@ from cairn_core import (
     query,
     retrieval,
     tags,
+    tasks,
     templates,
 )
 
@@ -201,6 +202,58 @@ def cmd_reindex(args):
     _emit(retrieval.reindex(_ws(args)), args)
 
 
+def cmd_tasks(args):
+    out = tasks.list_tasks(
+        _ws(args),
+        status=args.status or None,
+        project=args.project or None,
+        context=args.context or None,
+        due_before=args.due_before or None,
+        path=args.path,
+    )
+    if args.json:
+        print(json.dumps(out, ensure_ascii=False, indent=2))
+        return
+    if not out:
+        print("(no tasks)")
+        return
+    for t in out:
+        flag = "  ⚠ overdue" if t["overdue"] else ("  ● today" if t["today"] else "")
+        meta = " ".join(x for x in [f"+{t['project']}" if t["project"] else "", t["context"] or ""] if x)
+        print(f"[{(t['status'] or '?'):6}] {(t['due'] or '—'):>10}  {t['title']}"
+              f"{('  ' + meta) if meta else ''}{flag}   ({t['path']})")
+
+
+def cmd_task_add(args):
+    _emit(tasks.add_task(
+        _ws(args), args.title, due=args.due or None, project=args.project or None,
+        context=args.context or None, notes=args.notes, status=args.status, dir=args.dir,
+    ), args)
+
+
+def cmd_task_done(args):
+    _emit(tasks.complete_task(_ws(args), args.path, when=args.when or None), args)
+
+
+def cmd_task_update(args):
+    _emit(tasks.update_task(
+        _ws(args), args.path, status=args.status or None, due=args.due or None,
+        project=args.project or None, context=args.context or None,
+    ), args)
+
+
+def cmd_harvest(args):
+    res = tasks.harvest_checklists(
+        _ws(args), path=args.path, dir=args.dir, link_back=not args.no_link_back,
+    )
+    if args.json:
+        print(json.dumps(res, ensure_ascii=False, indent=2))
+        return
+    print(f"harvested {res['count']} task(s)")
+    for t in res["created"]:
+        print(f"  + {t['path']}  {t['title']}")
+
+
 def cmd_serve(args):
     from .serve import serve
     serve(_ws(args), host=args.host, port=args.port, web_dir=args.web_dir)
@@ -264,6 +317,30 @@ def build_parser() -> argparse.ArgumentParser:
     sp = add("retrieve", cmd_retrieve, "Find documents relevant to a query")
     sp.add_argument("query"); sp.add_argument("-k", type=int, default=5)
     add("reindex", cmd_reindex, "Build/refresh the embedding index (if configured)")
+    sp = add("tasks", cmd_tasks, "List tasks (category: task notes), sorted by due date")
+    sp.add_argument("path", nargs="?", default="", help="Limit to this subdirectory")
+    sp.add_argument("--status", default="", help="Filter: status / comma-list / 'all' (default: open)")
+    sp.add_argument("--project", default="", help="Filter by project")
+    sp.add_argument("--context", default="", help="Filter by context, e.g. @errand")
+    sp.add_argument("--due-before", dest="due_before", default="", help="Only tasks due before YYYY-MM-DD")
+    sp = add("task-add", cmd_task_add, "Create a task")
+    sp.add_argument("title")
+    sp.add_argument("--due", default="", help="Due date YYYY-MM-DD")
+    sp.add_argument("--project", default="")
+    sp.add_argument("--context", default="", help="e.g. @deep")
+    sp.add_argument("--status", default="todo", help="todo | doing | blocked | done")
+    sp.add_argument("--notes", default="", help="Body text")
+    sp.add_argument("--dir", default="tasks", help="Folder to file into (default: tasks)")
+    sp = add("task-done", cmd_task_done, "Mark a task done")
+    sp.add_argument("path"); sp.add_argument("--when", default="", help="Completion date (default: today)")
+    sp = add("task-update", cmd_task_update, "Update a task's fields in place")
+    sp.add_argument("path")
+    sp.add_argument("--status", default=""); sp.add_argument("--due", default="")
+    sp.add_argument("--project", default=""); sp.add_argument("--context", default="")
+    sp = add("harvest", cmd_harvest, "Promote '- [ ]' checkbox lines in notes into task files")
+    sp.add_argument("path", nargs="?", default="", help="File or folder to scan (default: whole workspace)")
+    sp.add_argument("--dir", default="tasks", help="Folder to file harvested tasks into")
+    sp.add_argument("--no-link-back", action="store_true", help="Don't annotate source lines (allows re-harvest)")
     sp = add("serve", cmd_serve, "Run the local HTTP API + web UI")
     sp.add_argument("--host", default="127.0.0.1"); sp.add_argument("--port", type=int, default=4177)
     sp.add_argument("--web-dir", help="Serve a static web UI from this directory (default: installed cairn-web)")

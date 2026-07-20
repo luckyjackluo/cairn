@@ -30,6 +30,7 @@ from cairn_core import (
     query,
     retrieval,
     tags,
+    tasks,
     templates,
 )
 
@@ -114,6 +115,34 @@ def find_by_meta(filters: dict, path: str = "") -> list[dict]:
 
 
 @mcp.tool(annotations=READ)
+def list_tasks(
+    status: str = "",
+    project: str = "",
+    context: str = "",
+    due_before: str = "",
+    path: str = "",
+) -> list[dict]:
+    """List tasks (documents with `category: task`), sorted by due date.
+
+    A task is an ordinary frontmatter note with a lifecycle; this is the task
+    view over it. `status` defaults to the open set (todo/doing/blocked) — pass
+    "all" to include done, or a specific status / comma-separated list.
+    `project` and `context` (e.g. "@errand") are exact case-insensitive filters;
+    `due_before` (YYYY-MM-DD) keeps only tasks due before that date. Each result
+    carries derived `overdue` and `today` flags relative to the current date.
+    """
+    return _guard(
+        tasks.list_tasks,
+        WS,
+        status or None,
+        project or None,
+        context or None,
+        due_before or None,
+        path,
+    )
+
+
+@mcp.tool(annotations=READ)
 def digest_workspace(path: str = "", group_by: str = "folder") -> dict:
     """Return a token-efficient map of the workspace: one entry (title, date,
     tags, summary) per document, grouped by `folder`, `tag`, or a metadata field
@@ -155,6 +184,69 @@ def create_file(
 def create_folder(path: str, name: str) -> dict:
     """Create a new folder `name` under `path`."""
     return _guard(FS.create_folder, path, name)
+
+
+@mcp.tool(annotations=WRITE)
+def add_task(
+    title: str,
+    due: str = "",
+    project: str = "",
+    context: str = "",
+    notes: str = "",
+    status: str = "todo",
+    dir: str = "tasks",
+) -> dict:
+    """Create a task (a `category: task` note) and return its record.
+
+    Files into `dir` (default `tasks/`) with a slug from `title`. `due` is
+    YYYY-MM-DD; `context` is a tag like "@errand"; `status` is
+    todo/doing/blocked/done. Colliding names get a numeric suffix, never clobber.
+    """
+    return _guard(
+        tasks.add_task, WS, title, due or None, project or None,
+        context or None, notes, status, None, dir,
+    )
+
+
+@mcp.tool(annotations=WRITE)
+def complete_task(path: str, when: str = "") -> dict:
+    """Mark a task done, stamping a `completed` date (defaults to today).
+
+    Surgical: only `status` and `completed` are rewritten; the rest of the file
+    is preserved byte-for-byte.
+    """
+    return _guard(tasks.complete_task, WS, path, when or None)
+
+
+@mcp.tool(annotations=WRITE)
+def update_task(
+    path: str,
+    status: str = "",
+    due: str = "",
+    project: str = "",
+    context: str = "",
+) -> dict:
+    """Update one or more fields of a task in place (surgical frontmatter edit).
+
+    Pass only the fields to change. `status` must be todo/doing/blocked/done;
+    `due` is YYYY-MM-DD; `context` is a tag like "@deep".
+    """
+    return _guard(
+        tasks.update_task, WS, path, status or None, due or None,
+        project or None, context or None,
+    )
+
+
+@mcp.tool(annotations=WRITE)
+def harvest_checklists(path: str = "", dir: str = "tasks", link_back: bool = True) -> dict:
+    """Promote `- [ ]` checkbox lines in notes into canonical task files.
+
+    Scans text under `path` (a file or folder; default whole workspace), turning
+    each unchecked checkbox into a task and parsing inline `due:YYYY-MM-DD`,
+    `+project` and `@context` tokens. With `link_back` (default), each harvested
+    line is annotated so re-running never double-harvests. Returns {created, count}.
+    """
+    return _guard(tasks.harvest_checklists, WS, path, dir, link_back)
 
 
 @mcp.tool(annotations=WRITE)
