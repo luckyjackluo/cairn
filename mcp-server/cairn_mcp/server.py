@@ -26,8 +26,11 @@ from cairn_core import (
     FileService,
     Workspace,
     WorkspaceError,
+    bills,
     digest,
+    lifecycle,
     query,
+    reco,
     retrieval,
     tags,
     tasks,
@@ -166,6 +169,23 @@ def semantic_retrieve(query: str, k: int = 5) -> list[dict]:
     return _guard(retrieval.semantic_retrieve, WS, query, k)
 
 
+@mcp.tool(annotations=READ)
+def list_paper_projects() -> list[dict]:
+    """List projects configured for paper recommendations (.cairn/paper_reco.json)."""
+    return _guard(reco.list_projects, WS)
+
+
+@mcp.tool(annotations=READ)
+def preview_paper_recommendations(project: str, count: int = 3) -> dict:
+    """Preview the top unseen recommended papers for a project WITHOUT saving.
+
+    Ranks the project's candidate pool by relevance × citation impact and skips
+    anything already recommended or already filed. Use this to inspect the queue
+    or check a project's topic queries before committing notes.
+    """
+    return _guard(reco.preview, WS, project, count)
+
+
 # --- additive / modifying tools -------------------------------------------
 
 @mcp.tool(annotations=WRITE)
@@ -249,6 +269,136 @@ def harvest_checklists(path: str = "", dir: str = "tasks", link_back: bool = Tru
     return _guard(tasks.harvest_checklists, WS, path, dir, link_back)
 
 
+# --- shared bills ----------------------------------------------------------
+
+@mcp.tool(annotations=READ)
+def who_owes(path: str = "") -> dict:
+    """Summarize who still owes the user money, across all open shared bills.
+
+    This is the reminder view: one row per person — {name, owes, bills,
+    oldest_days} — sorted so whoever has been owing longest comes first, plus a
+    grand `total` and `bill_count`. Returns an empty `people` list when
+    everything is settled, which is the signal to stay quiet rather than send an
+    empty reminder.
+    """
+    return _guard(bills.who_owes, WS, path)
+
+
+@mcp.tool(annotations=READ)
+def list_bills(status: str = "", person: str = "", path: str = "") -> list[dict]:
+    """List shared bills (documents with `category: bill`), oldest first.
+
+    `status` defaults to "open" (someone is still unpaid); pass "settled" or
+    "all". `person` filters to bills naming that person. Each result carries the
+    per-person breakdown plus a derived `outstanding` balance and `age_days`.
+    Use this to find a specific bill; use `who_owes` for the reminder summary.
+    """
+    return _guard(bills.list_bills, WS, status or None, person or None, path)
+
+
+@mcp.tool(annotations=READ)
+def attention(kinds: list[str] | None = None, upcoming_days: int = 3, path: str = "") -> dict:
+    """Everything across the workspace that is waiting on the user right now.
+
+    The one reminder primitive spanning every lifecycle kind — tasks, bills,
+    papers, and any future kind — not one query per kind. Sweeps all OPEN items
+    and returns those that are `overdue`, `due_today`, `upcoming` (within
+    `upcoming_days`), or `stale` (open past their kind's staleness threshold
+    without a status change). `kinds` restricts to specific categories (e.g.
+    ["task","bill"]); omit for all.
+
+    Returns {as_of, count, buckets, items}: `buckets` groups items by urgency
+    (most pressing first), each item carrying its `kind`, `due`, `age_days`, and
+    the `reasons` it was flagged. A `count` of 0 means nothing needs the user —
+    the signal to stay quiet rather than send an empty reminder.
+    """
+    return _guard(lifecycle.attention, WS, kinds, None, upcoming_days, path)
+
+
+@mcp.tool(annotations=WRITE)
+def reminder_digest(upcoming_days: int = 3, path: str = "", preview: bool = False) -> dict:
+    """The daily reminder to send: only what is DUE to be re-surfaced today.
+
+    Like `attention`, but cadence-filtered — an item reappears only when its own
+    reminder interval has elapsed since it was last sent (a per-note `remind_every`
+    frontmatter field, else the kind default of daily), with `overdue`/`due_today`
+    items escalated to daily whatever their cadence. This is the tool a reminder
+    cron calls; it records what it sent to a workspace ledger so the next run's
+    cadence is right (a WRITE, hence the annotation). Pass preview=true to see the
+    due set WITHOUT recording (leaves cadence untouched).
+
+    Returns {as_of, count, buckets, items}. A `count` of 0 means send nothing —
+    the signal to stay quiet rather than deliver an empty reminder.
+    """
+    return _guard(lifecycle.reminder_digest, WS, None, upcoming_days, path, not preview)
+
+
+@mcp.tool(annotations=WRITE)
+def set_status(path: str, status: str) -> dict:
+    """Set a note's lifecycle status, stamping when it changed.
+
+    The kind-agnostic way to move any lifecycle note between states — mark a
+    paper `read`, a task `doing`, reopen a bill. Validates `status` against the
+    note's kind (rejecting a value the kind doesn't define) and records
+    `status_changed` so staleness is measured from this moment. For tasks and
+    bills the kind-specific tools (complete_task, settle_bill) carry extra domain
+    logic; prefer those when they fit, and this for everything else.
+
+    Returns {path, kind, status, state, status_changed}.
+    """
+    return _guard(lifecycle.stamp_status, WS, path, status)
+
+
+@mcp.tool(annotations=WRITE)
+def add_bill(
+    place: str,
+    total: str,
+    people: list[str],
+    date: str = "",
+    shares: dict | None = None,
+    include_self: bool = True,
+    currency: str = "USD",
+    notes: str = "",
+    dir: str = "personal/bills",
+) -> dict:
+    """Record a bill the user paid and is owed for, splitting it across `people`.
+
+    `people` are the OTHERS on the bill — never the user. By default `total`
+    splits evenly across them plus the user; pass include_self=false when the
+    user was only fronting the money and owes no share. `shares` pins exact
+    amounts for specific people ({"alex": "52.30"}) and the rest split what
+    remains; rounding remainders fall on the user, never on a guest. `date` is
+    YYYY-MM-DD (default today).
+    """
+    return _guard(
+        bills.add_bill, WS, place, total, people, date or None, shares,
+        include_self, currency, notes, dir,
+    )
+
+
+@mcp.tool(annotations=WRITE)
+def settle_bill(person: str, path: str = "", state: str = "paid", when: str = "") -> dict:
+    """Stop tracking what `person` owes — because they paid, or the user waived it.
+
+    With `path` omitted this settles that person across EVERY open bill, which
+    is what "Alex paid me back" usually means; pass `path` to settle just one.
+    `state` is "paid" when the money actually arrived and "waived" when the user
+    has decided to stop chasing it — both end the reminders, but only "paid"
+    claims repayment, so do not substitute one for the other. A bill closes
+    itself once nobody on it is unpaid.
+    """
+    return _guard(bills.settle, WS, person, path or None, state, when or None)
+
+
+@mcp.tool(annotations=WRITE)
+def add_person_to_bill(path: str, person: str, owes: str) -> dict:
+    """Add someone to an existing bill for an explicit amount.
+
+    Does not re-split the bill: the others have already been told what they owe.
+    """
+    return _guard(bills.add_person, WS, path, person, owes)
+
+
 @mcp.tool(annotations=WRITE)
 def update_file_tags(path: str, tags_list: list[str]) -> dict:
     """Replace a document's tags — in a .uni's tags array or a text file's YAML frontmatter."""
@@ -277,6 +427,27 @@ def import_folder(path: str = "") -> dict:
 def reindex() -> dict:
     """Build/refresh the embedding index (no-op if no embedder is configured)."""
     return _guard(retrieval.reindex, WS)
+
+
+@mcp.tool(annotations=WRITE)
+def recommend_papers(project: str, count: int = 1) -> dict:
+    """Recommend + FILE the top unseen paper(s) for one project as to-read notes.
+
+    Picks the highest relevance×impact paper the project hasn't seen, writes it
+    into the papers folder as a `paper` note (status: to-read), and records it so
+    it never repeats. Returns the picks (title, why, citations, path). Run daily
+    for a steady walk through a field's canon, one paper per project per day.
+    """
+    return _guard(reco.recommend, WS, project, count)
+
+
+@mcp.tool(annotations=WRITE)
+def recommend_papers_all_projects(count: int = 1) -> dict:
+    """Recommend + file the top unseen paper(s) for EVERY configured project.
+
+    The daily-driver: one call yields one new to-read paper note per project.
+    """
+    return _guard(reco.recommend_all, WS, count)
 
 
 # --- destructive tools (client will confirm) ------------------------------

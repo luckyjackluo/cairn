@@ -21,8 +21,11 @@ from cairn_core import (
     FileService,
     Workspace,
     WorkspaceError,
+    bills,
     digest,
+    lifecycle,
     query,
+    reco,
     retrieval,
     tags,
     tasks,
@@ -202,6 +205,46 @@ def cmd_reindex(args):
     _emit(retrieval.reindex(_ws(args)), args)
 
 
+def cmd_recommend(args):
+    ws = _ws(args)
+    save = not args.preview
+    if args.all or not args.project:
+        result = reco.recommend_all(ws, count=args.count, save=save)
+        results = result["projects"]
+    else:
+        results = [reco.recommend(ws, args.project, count=args.count, save=save)]
+    if args.json:
+        print(json.dumps(results if (args.all or not args.project) else results[0],
+                         ensure_ascii=False, indent=2))
+        return
+    print(_render_recos(results, save))
+
+
+def _render_recos(results: list[dict], saved: bool) -> str:
+    blocks = []
+    for r in results:
+        head = f"### {r['project']}"
+        if r.get("error"):
+            blocks.append(f"{head}\n  error: {r['error']}")
+            continue
+        if not r["picks"]:
+            blocks.append(f"{head}\n  (no new papers — pool exhausted or all seen)")
+            continue
+        lines = [head]
+        for p in r["picks"]:
+            authors = ", ".join(p["authors"][:3]) + (" et al." if len(p["authors"]) > 3 else "")
+            lines.append(f"  • {p['title']} ({p.get('year','?')})")
+            lines.append(f"    {authors}  —  {p['citationCount']:,} citations  ·  score {p['score']}")
+            if p.get("url"):
+                lines.append(f"    {p['url']}")
+            if saved and p.get("path"):
+                lines.append(f"    filed: {p['path']}")
+            if saved and p.get("fulltext_path"):
+                lines.append(f"    full text: {p['fulltext_path']}")
+        blocks.append("\n".join(lines))
+    return "\n\n".join(blocks) if blocks else "(nothing)"
+
+
 def cmd_tasks(args):
     out = tasks.list_tasks(
         _ws(args),
@@ -252,6 +295,114 @@ def cmd_harvest(args):
     print(f"harvested {res['count']} task(s)")
     for t in res["created"]:
         print(f"  + {t['path']}  {t['title']}")
+
+
+def cmd_bills(args):
+    out = bills.list_bills(
+        _ws(args), status=args.status or None, person=args.person or None, path=args.path,
+    )
+    if args.json:
+        print(json.dumps(out, ensure_ascii=False, indent=2))
+        return
+    if not out:
+        print("(no open bills)")
+        return
+    for b in out:
+        age = f"  {b['age_days']}d" if b["age_days"] is not None else ""
+        print(f"{(b['date'] or '—'):>10}  {b['place']}  "
+              f"{b['currency']} {b['outstanding']} outstanding{age}   ({b['path']})")
+        for p in b["people"]:
+            mark = {"unpaid": "·", "paid": "✓", "waived": "~"}[p["state"]]
+            print(f"    {mark} {p['name']:12} {p['owes'] or '?'}")
+
+
+def cmd_owed(args):
+    out = bills.who_owes(_ws(args), path=args.path)
+    if args.json:
+        print(json.dumps(out, ensure_ascii=False, indent=2))
+        return
+    if not out["people"]:
+        print("(nobody owes you anything)")
+        return
+    print(f"Unpaid — {out['currency']} {out['total']} across {out['bill_count']} bill(s)\n")
+    for r in out["people"]:
+        age = f", oldest {r['oldest_days']}d" if r["oldest_days"] is not None else ""
+        print(f"  {r['name']:12} {r['owes']:>9}  ({len(r['bills'])} bill(s){age})")
+
+
+def cmd_bill_add(args):
+    shares = json.loads(args.shares) if args.shares else None
+    _emit(bills.add_bill(
+        _ws(args), args.place, args.total, args.person, date=args.date or None,
+        shares=shares, include_self=not args.no_self, currency=args.currency,
+        notes=args.notes, dir=args.dir,
+    ), args)
+
+
+def cmd_bill_settle(args):
+    res = bills.settle(
+        _ws(args), args.person, path=args.path or None,
+        state="waived" if args.waive else "paid", when=args.when or None,
+    )
+    if args.json:
+        print(json.dumps(res, ensure_ascii=False, indent=2))
+        return
+    print(f"{res['person']}: {res['state']} on {res['count']} bill(s)")
+    for b in res["updated"]:
+        print(f"  {b['path']}  ({b['status']}, {b['outstanding']} left)")
+
+
+def cmd_attention(args):
+    out = lifecycle.attention(
+        _ws(args),
+        kinds=[k for k in (args.kind or "").replace(",", " ").split()] or None,
+        upcoming_days=args.upcoming_days,
+        path=args.path,
+    )
+    if args.json:
+        print(json.dumps(out, ensure_ascii=False, indent=2))
+        return
+    if not out["count"]:
+        print("✓ nothing needs you right now")
+        return
+    labels = {"overdue": "⚠ OVERDUE", "due_today": "● DUE TODAY",
+              "stale": "… STALE", "upcoming": "→ UPCOMING"}
+    print(f"{out['count']} item(s) need you — as of {out['as_of']}")
+    for bucket, items in out["buckets"].items():
+        if not items:
+            continue
+        print(f"\n{labels[bucket]}")
+        for it in items:
+            when = it["due"] or (f"{it['age_days']}d open" if it["age_days"] is not None else "")
+            print(f"  [{it['kind']:5}] {when:>11}  {it['title']}   ({it['path']})")
+
+
+def cmd_status_set(args):
+    _emit(lifecycle.stamp_status(_ws(args), args.path, args.status), args)
+
+
+def cmd_remind(args):
+    out = lifecycle.reminder_digest(
+        _ws(args), upcoming_days=args.upcoming_days, path=args.path,
+        record=not args.preview,
+    )
+    if args.json:
+        print(json.dumps(out, ensure_ascii=False, indent=2))
+        return
+    if not out["count"]:
+        print("(nothing due for a reminder)")  # cron's cue to stay silent
+        return
+    labels = {"overdue": "⚠ OVERDUE", "due_today": "● DUE TODAY",
+              "stale": "… STALE", "upcoming": "→ UPCOMING"}
+    head = "preview — " if args.preview else ""
+    print(f"{head}{out['count']} reminder(s) — as of {out['as_of']}")
+    for bucket, items in out["buckets"].items():
+        if not items:
+            continue
+        print(f"\n{labels[bucket]}")
+        for it in items:
+            when = it["due"] or (f"{it['age_days']}d open" if it["age_days"] is not None else "")
+            print(f"  [{it['kind']:5}] {when:>11}  {it['title']}   ({it['path']})")
 
 
 def cmd_serve(args):
@@ -317,6 +468,11 @@ def build_parser() -> argparse.ArgumentParser:
     sp = add("retrieve", cmd_retrieve, "Find documents relevant to a query")
     sp.add_argument("query"); sp.add_argument("-k", type=int, default=5)
     add("reindex", cmd_reindex, "Build/refresh the embedding index (if configured)")
+    sp = add("recommend", cmd_recommend, "Recommend impactful papers per project (.cairn/paper_reco.json)")
+    sp.add_argument("project", nargs="?", default="", help="Project name (omit or use --all for every project)")
+    sp.add_argument("--all", action="store_true", help="Recommend for every configured project")
+    sp.add_argument("--count", type=int, default=1, help="Papers per project (default: 1)")
+    sp.add_argument("--preview", action="store_true", help="Rank + show picks without filing notes")
     sp = add("tasks", cmd_tasks, "List tasks (category: task notes), sorted by due date")
     sp.add_argument("path", nargs="?", default="", help="Limit to this subdirectory")
     sp.add_argument("--status", default="", help="Filter: status / comma-list / 'all' (default: open)")
@@ -341,6 +497,39 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("path", nargs="?", default="", help="File or folder to scan (default: whole workspace)")
     sp.add_argument("--dir", default="tasks", help="Folder to file harvested tasks into")
     sp.add_argument("--no-link-back", action="store_true", help="Don't annotate source lines (allows re-harvest)")
+    sp = add("bills", cmd_bills, "List shared bills you're owed for")
+    sp.add_argument("--status", default="", help="open (default) | settled | all")
+    sp.add_argument("--person", default="", help="Only bills naming this person")
+    sp.add_argument("--path", default="", help="Limit to a subfolder")
+    sp = add("owed", cmd_owed, "Summarize who still owes you, across all open bills")
+    sp.add_argument("--path", default="", help="Limit to a subfolder")
+    sp = add("bill-add", cmd_bill_add, "Record a bill you paid and split with others")
+    sp.add_argument("place", help="Where it was, or what it was for")
+    sp.add_argument("total")
+    sp.add_argument("person", nargs="+", help="The others on the bill (not you)")
+    sp.add_argument("--date", default="", help="YYYY-MM-DD (default: today)")
+    sp.add_argument("--shares", default="", help='Pin exact amounts, e.g. \'{"alex":"52.30"}\'')
+    sp.add_argument("--no-self", action="store_true", help="You owe no share (you only fronted it)")
+    sp.add_argument("--currency", default="USD")
+    sp.add_argument("--notes", default="", help="Body text")
+    sp.add_argument("--dir", default="personal/bills", help="Folder to file into")
+    sp = add("bill-settle", cmd_bill_settle, "Mark someone paid (or waive what they owe)")
+    sp.add_argument("person")
+    sp.add_argument("--path", default="", help="Just this bill (default: all their open bills)")
+    sp.add_argument("--waive", action="store_true", help="Write it off rather than record repayment")
+    sp.add_argument("--when", default="", help="Settlement date (default: today)")
+    sp = add("attention", cmd_attention, "Everything waiting on you now: overdue, due, stale (all kinds)")
+    sp.add_argument("path", nargs="?", default="", help="Limit to this subdirectory")
+    sp.add_argument("--kind", default="", help="Restrict to kinds, e.g. 'task,bill' (default: all)")
+    sp.add_argument("--upcoming-days", dest="upcoming_days", type=int, default=3,
+                    help="Flag items due within this many days (default: 3)")
+    sp = add("status", cmd_status_set, "Set a note's lifecycle status (stamps status_changed)")
+    sp.add_argument("path"); sp.add_argument("status", help="New status, validated against the note's kind")
+    sp = add("remind", cmd_remind, "Reminder digest: only what's due to nag today (cadence-filtered)")
+    sp.add_argument("path", nargs="?", default="", help="Limit to this subdirectory")
+    sp.add_argument("--upcoming-days", dest="upcoming_days", type=int, default=3,
+                    help="Flag items due within this many days (default: 3)")
+    sp.add_argument("--preview", action="store_true", help="Show without consuming the reminder (no ledger write)")
     sp = add("serve", cmd_serve, "Run the local HTTP API + web UI")
     sp.add_argument("--host", default="127.0.0.1"); sp.add_argument("--port", type=int, default=4177)
     sp.add_argument("--web-dir", help="Serve a static web UI from this directory (default: installed cairn-web)")

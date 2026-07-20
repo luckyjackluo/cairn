@@ -33,7 +33,7 @@ import datetime
 import re
 from typing import Any
 
-from . import frontmatter, query, uni
+from . import lifecycle, query
 from .files import FileError, FileService, _is_text
 from .workspace import Workspace
 
@@ -216,30 +216,25 @@ def add_task(
     return _record(ws, item["path"], meta, datetime.date.today())
 
 
-def _write_meta(ws: Workspace, path: str, updates: dict[str, Any]) -> dict[str, Any]:
-    """Apply frontmatter/metadata ``updates`` to a task and return its record."""
-    p = ws.resolve(path)
-    if not p.is_file():
-        raise FileError(f"Not a file: {path!r}")
-    if uni.is_uni(p):
-        obj = uni.read_uni(p)
-        obj.setdefault("metadata", {}).update(updates)
-        uni.write_uni(p, obj)
-    elif _is_text(p):
-        text = p.read_text(encoding="utf-8", errors="replace")
-        for key, value in updates.items():
-            text = frontmatter.set_field(text, key, value)
-        p.write_text(text, encoding="utf-8")
-    else:
-        raise FileError(f"Cannot update a binary file: {path!r}")
-    meta = query.doc_meta(p) or {}
-    return _record(ws, ws.relpath(p), meta, datetime.date.today())
+def _write_meta(
+    ws: Workspace, path: str, updates: dict[str, Any], when: str | None = None,
+) -> dict[str, Any]:
+    """Apply metadata ``updates`` to a task and return its record.
+
+    Delegates the surgical write to :func:`cairn_core.lifecycle.write_fields`, the
+    shared writer — so a status change here stamps ``status_changed`` for staleness
+    exactly as it would for any other kind. ``when`` dates that stamp; pass it when
+    the caller is recording a transition on a specific day (e.g. a backdated
+    completion) so ``status_changed`` and the domain date agree.
+    """
+    meta = lifecycle.write_fields(ws, path, updates, when=when)
+    return _record(ws, ws.relpath(ws.resolve(path)), meta, datetime.date.today())
 
 
 def complete_task(ws: Workspace, path: str, when: str | None = None) -> dict[str, Any]:
     """Mark a task done, stamping a ``completed`` date (defaults to today)."""
     done_on = when or datetime.date.today().isoformat()
-    return _write_meta(ws, path, {"status": "done", "completed": done_on})
+    return _write_meta(ws, path, {"status": "done", "completed": done_on}, when=done_on)
 
 
 def update_task(
