@@ -6,7 +6,10 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 dependencies = [
-    "mcp>=1.6.0",
+    # Cap below 2.0: mcp 2.0 removed `mcp.server.fastmcp` (the FastMCP API this
+    # server is built on), so an unpinned install resolves 2.x and crashes on
+    # import. Keep on the 1.x FastMCP line until the server is migrated.
+    "mcp>=1.6.0,<2",
     "cairn-core>=0.3.0",
 ]
 
