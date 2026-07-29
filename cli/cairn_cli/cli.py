@@ -209,10 +209,12 @@ def cmd_recommend(args):
     ws = _ws(args)
     save = not args.preview
     if args.all or not args.project:
-        result = reco.recommend_all(ws, count=args.count, save=save)
+        result = reco.recommend_all(ws, count=args.count, save=save, refresh=args.refresh)
         results = result["projects"]
     else:
-        results = [reco.recommend(ws, args.project, count=args.count, save=save)]
+        results = [
+            reco.recommend(ws, args.project, count=args.count, save=save, refresh=args.refresh)
+        ]
     if args.json:
         print(json.dumps(results if (args.all or not args.project) else results[0],
                          ensure_ascii=False, indent=2))
@@ -473,6 +475,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--all", action="store_true", help="Recommend for every configured project")
     sp.add_argument("--count", type=int, default=1, help="Papers per project (default: 1)")
     sp.add_argument("--preview", action="store_true", help="Rank + show picks without filing notes")
+    sp.add_argument("--refresh", action="store_true",
+                    help="Re-pull the ranked pool from Semantic Scholar (ignores the cache)")
     sp = add("tasks", cmd_tasks, "List tasks (category: task notes), sorted by due date")
     sp.add_argument("path", nargs="?", default="", help="Limit to this subdirectory")
     sp.add_argument("--status", default="", help="Filter: status / comma-list / 'all' (default: open)")

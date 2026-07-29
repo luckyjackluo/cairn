@@ -176,14 +176,15 @@ def list_paper_projects() -> list[dict]:
 
 
 @mcp.tool(annotations=READ)
-def preview_paper_recommendations(project: str, count: int = 3) -> dict:
+def preview_paper_recommendations(project: str, count: int = 3, refresh: bool = False) -> dict:
     """Preview the top unseen recommended papers for a project WITHOUT saving.
 
     Ranks the project's candidate pool by relevance × citation impact and skips
     anything already recommended or already filed. Use this to inspect the queue
-    or check a project's topic queries before committing notes.
+    or check a project's topic queries before committing notes. Set `refresh` to
+    re-pull the pool from Semantic Scholar instead of using the cached one.
     """
-    return _guard(reco.preview, WS, project, count)
+    return _guard(reco.preview, WS, project, count, refresh=refresh)
 
 
 # --- additive / modifying tools -------------------------------------------
@@ -430,24 +431,26 @@ def reindex() -> dict:
 
 
 @mcp.tool(annotations=WRITE)
-def recommend_papers(project: str, count: int = 1) -> dict:
+def recommend_papers(project: str, count: int = 1, refresh: bool = False) -> dict:
     """Recommend + FILE the top unseen paper(s) for one project as to-read notes.
 
     Picks the highest relevance×impact paper the project hasn't seen, writes it
     into the papers folder as a `paper` note (status: to-read), and records it so
     it never repeats. Returns the picks (title, why, citations, path). Run daily
     for a steady walk through a field's canon, one paper per project per day.
+    Set `refresh` to re-pull the ranked pool instead of using the cached one.
     """
-    return _guard(reco.recommend, WS, project, count)
+    return _guard(reco.recommend, WS, project, count, refresh=refresh)
 
 
 @mcp.tool(annotations=WRITE)
-def recommend_papers_all_projects(count: int = 1) -> dict:
+def recommend_papers_all_projects(count: int = 1, refresh: bool = False) -> dict:
     """Recommend + file the top unseen paper(s) for EVERY configured project.
 
     The daily-driver: one call yields one new to-read paper note per project.
+    Set `refresh` to re-pull each ranked pool instead of using the cached one.
     """
-    return _guard(reco.recommend_all, WS, count)
+    return _guard(reco.recommend_all, WS, count, refresh=refresh)
 
 
 # --- destructive tools (client will confirm) ------------------------------

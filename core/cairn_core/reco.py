@@ -27,6 +27,7 @@ Design choices worth knowing:
 from __future__ import annotations
 
 import datetime
+import hashlib
 import json
 import math
 import os
@@ -44,6 +45,7 @@ from .workspace import Workspace
 
 CONFIG_PATH = ".cairn/paper_reco.json"
 STATE_PATH = ".cairn/paper_reco_state.json"
+POOL_PATH = ".cairn/paper_reco_pool.json"
 
 _S2_BULK = "https://api.semanticscholar.org/graph/v1/paper/search/bulk"
 _S2_FIELDS = (
@@ -58,6 +60,7 @@ _DEFAULTS: dict[str, Any] = {
     "min_citations": 20,
     "per_query": 30,      # top-by-citation members pulled from each tight query
     "impact_weight": 0.5,  # how much citations shift the relevance-primary score
+    "pool_ttl_days": 7,    # reuse a project's ranked pool this long before re-querying
     "max_authors": 6,      # authors recorded in a note's frontmatter
     "import_fulltext": True,               # download + convert each pick's PDF
     "fulltext_dir": "research/papers/fulltext",
@@ -243,6 +246,84 @@ def _rank_candidates(
             }
         )
     ranked.sort(key=lambda c: c["score"], reverse=True)
+    return ranked
+
+
+# --------------------------------------------------------------------------- #
+# ranked-pool cache
+# --------------------------------------------------------------------------- #
+#
+# A project's ranked pool is many S2 round-trips (one per facet query) but it is
+# near-static: it is the field's high-impact literature, which does not turn over
+# daily. The daily run only needs "the top entry I haven't seen", so re-querying
+# the whole pool every day is pure waste — and on the unauthenticated S2 pool the
+# 429 backoff makes that walk long enough to blow the caller's timeout. Cache the
+# ranked list per project and refresh it only when it ages out or its inputs
+# change.
+
+def _pool_fingerprint(pcfg: dict[str, Any], defaults: dict[str, Any]) -> str:
+    """Identity of the inputs that determine a pool — edit any, get a fresh pull."""
+    payload = {
+        "queries": pcfg["queries"],
+        "fields_of_study": pcfg.get("fields_of_study", defaults["fields_of_study"]),
+        "min_citations": int(pcfg.get("min_citations", defaults["min_citations"])),
+        "per_query": int(pcfg.get("per_query", defaults["per_query"])),
+        "impact_weight": float(defaults["impact_weight"]),
+    }
+    blob = json.dumps(payload, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
+
+
+def _load_pool_cache(ws: Workspace) -> dict[str, Any]:
+    p = ws.root / POOL_PATH
+    if not p.is_file():
+        return {}
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (ValueError, OSError):
+        return {}  # a corrupt cache is a cache miss, never a failure
+    return data if isinstance(data, dict) else {}
+
+
+def _save_pool_cache(ws: Workspace, cache: dict[str, Any]) -> None:
+    p = ws.root / POOL_PATH
+    p.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        p.write_text(json.dumps(cache, ensure_ascii=False, indent=2), encoding="utf-8")
+    except OSError:
+        pass  # caching is an optimization; never fail a run over it
+
+
+def _ranked_pool(
+    ws: Workspace,
+    project: str,
+    pcfg: dict[str, Any],
+    defaults: dict[str, Any],
+    api_key: str | None,
+    refresh: bool = False,
+) -> list[dict[str, Any]]:
+    """``_rank_candidates`` memoized per project, keyed by config + age."""
+    fingerprint = _pool_fingerprint(pcfg, defaults)
+    ttl_days = int(defaults.get("pool_ttl_days", _DEFAULTS["pool_ttl_days"]))
+    today = datetime.date.today()
+
+    cache = _load_pool_cache(ws)
+    entry = cache.get(project)
+    if not refresh and isinstance(entry, dict) and entry.get("fingerprint") == fingerprint:
+        try:
+            age = (today - datetime.date.fromisoformat(entry["built"])).days
+        except (KeyError, TypeError, ValueError):
+            age = ttl_days + 1
+        if 0 <= age < ttl_days and isinstance(entry.get("ranked"), list):
+            return entry["ranked"]
+
+    ranked = _rank_candidates(pcfg, defaults, api_key)
+    cache[project] = {
+        "fingerprint": fingerprint,
+        "built": today.isoformat(),
+        "ranked": ranked,
+    }
+    _save_pool_cache(ws, cache)
     return ranked
 
 
@@ -496,6 +577,7 @@ def recommend(
     count: int = 1,
     save: bool = True,
     api_key: str | None = None,
+    refresh: bool = False,
 ) -> dict[str, Any]:
     """Recommend the top ``count`` unseen papers for ``project``.
 
@@ -503,6 +585,9 @@ def recommend(
     already recommended or already filed, and (when ``save``) writes each pick
     into the workspace as a ``to-read`` paper note, recording it so it never
     repeats. Returns ``{project, picks: [...], saved, exhausted}``.
+
+    The ranked pool is cached for ``pool_ttl_days``; pass ``refresh`` to force a
+    fresh pull from Semantic Scholar.
     """
     api_key = api_key or os.environ.get("S2_API_KEY")
     cfg = load_config(ws)
@@ -511,7 +596,7 @@ def recommend(
     today = datetime.date.today().isoformat()
     papers_dir = pcfg.get("papers_dir", defaults["papers_dir"])
 
-    ranked = _rank_candidates(pcfg, defaults, api_key)
+    ranked = _ranked_pool(ws, project, pcfg, defaults, api_key, refresh=refresh)
     seen = _seen_keys(ws, project, papers_dir)
 
     fs = FileService(ws)
@@ -545,21 +630,33 @@ def recommend(
 
 
 def recommend_all(
-    ws: Workspace, count: int = 1, save: bool = True, api_key: str | None = None
+    ws: Workspace,
+    count: int = 1,
+    save: bool = True,
+    api_key: str | None = None,
+    refresh: bool = False,
 ) -> dict[str, Any]:
     """Run :func:`recommend` for every configured project (the daily driver)."""
     cfg = load_config(ws)
     results = []
     for project in sorted(cfg["projects"]):
         try:
-            results.append(recommend(ws, project, count=count, save=save, api_key=api_key))
+            results.append(
+                recommend(
+                    ws, project, count=count, save=save, api_key=api_key, refresh=refresh
+                )
+            )
         except FileError as exc:
             results.append({"project": project, "error": str(exc), "picks": []})
     return {"date": datetime.date.today().isoformat(), "projects": results}
 
 
 def preview(
-    ws: Workspace, project: str, count: int = 3, api_key: str | None = None
+    ws: Workspace,
+    project: str,
+    count: int = 3,
+    api_key: str | None = None,
+    refresh: bool = False,
 ) -> dict[str, Any]:
     """Like :func:`recommend` but never writes — for inspecting the queue."""
-    return recommend(ws, project, count=count, save=False, api_key=api_key)
+    return recommend(ws, project, count=count, save=False, api_key=api_key, refresh=refresh)
