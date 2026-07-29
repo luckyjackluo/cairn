@@ -33,6 +33,7 @@ from cairn_core import (
     query,
     reco,
     retrieval,
+    review,
     tags,
     tasks,
     templates,
@@ -418,6 +419,22 @@ def refresh_project_dashboard(project: str = "", all: bool = False, stale_after_
     if all or not project:
         return _guard(pulse.refresh_all_dashboards, WS, "projects", None, stale_after_days)
     return _guard(pulse.refresh_dashboard, WS, project, "projects", None, stale_after_days)
+
+
+@mcp.tool(annotations=READ)
+def weekly_review(window_days: int = 7, horizon_days: int = 7, focus_limit: int = 5) -> dict:
+    """The weekly review: accomplishments, project health, the week ahead, focus.
+
+    The once-a-week synthesis above the daily reminder digest — pure composition,
+    no side effects. Returns {as_of, since, horizon, closed, closed_count,
+    projects, stalled, due_next_week, focus}: `closed` is every lifecycle item
+    finished in the last `window_days` (tasks done, papers read, bills settled);
+    `projects`/`stalled` is the per-project pulse; `due_next_week` is dated items
+    needing attention within `horizon_days` (overdue + due-today + upcoming); and
+    `focus` is the top `focus_limit` next-actions to lead the week with. This is
+    the tool a weekly-review cron calls.
+    """
+    return _guard(review.weekly_review, WS, None, window_days, horizon_days, focus_limit)
 
 
 @mcp.tool(annotations=WRITE)

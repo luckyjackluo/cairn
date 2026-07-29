@@ -28,6 +28,7 @@ from cairn_core import (
     query,
     reco,
     retrieval,
+    review,
     tags,
     tasks,
     templates,
@@ -278,6 +279,40 @@ def _task_line(t: dict) -> str:
     meta = " ".join(x for x in [f"+{t['project']}" if t["project"] else "", t["context"] or ""] if x)
     return (f"[{(t['status'] or '?'):6}] {(t['due'] or '—'):>10}  {marks}{t['title']}"
             f"{('  ' + meta) if meta else ''}{flag}   ({t['path']})")
+
+
+def cmd_review(args):
+    out = review.weekly_review(
+        _ws(args), window_days=args.window, horizon_days=args.horizon,
+        focus_limit=args.focus,
+    )
+    if args.json:
+        print(json.dumps(out, ensure_ascii=False, indent=2))
+        return
+    print(f"Weekly review — {out['since']} → {out['as_of']} (week ahead to {out['horizon']})")
+
+    print(f"\n✓ Closed this week ({out['closed_count']})")
+    for c in out["closed"]:
+        proj = f"  +{c['project']}" if c["project"] else ""
+        print(f"  [{c['kind']:5}] {c['closed_on']}  {c['title']}{proj}")
+    if not out["closed"]:
+        print("  (nothing closed)")
+
+    if out["stalled"]:
+        print(f"\n… Stalled projects: {', '.join(out['stalled'])}")
+
+    print(f"\n→ Due next week ({len(out['due_next_week'])})")
+    for it in out["due_next_week"]:
+        when = it["due"] or ""
+        print(f"  [{it['kind']:5}] {when:>10}  {it['title']}")
+    if not out["due_next_week"]:
+        print("  (nothing due)")
+
+    print(f"\n★ Focus")
+    for t in out["focus"]:
+        print("  " + _task_line(t))
+    if not out["focus"]:
+        print("  (nothing actionable)")
 
 
 def cmd_next(args):
@@ -571,6 +606,10 @@ def build_parser() -> argparse.ArgumentParser:
     sp = add("next", cmd_next, "Next actions: open, unblocked tasks ranked overdue→priority→due")
     sp.add_argument("--project", default="", help="Scope to one project")
     sp.add_argument("--limit", type=int, default=0, help="Cap the list (0 = no cap)")
+    sp = add("review", cmd_review, "Weekly review: closed this week, stalled, due next week, focus")
+    sp.add_argument("--window", type=int, default=7, help="Lookback days for 'closed this week' (default: 7)")
+    sp.add_argument("--horizon", type=int, default=7, help="Lookahead days for 'due next week' (default: 7)")
+    sp.add_argument("--focus", type=int, default=5, help="How many next-actions to spotlight (default: 5)")
     sp = add("task-add", cmd_task_add, "Create a task")
     sp.add_argument("title")
     sp.add_argument("--due", default="", help="Due date YYYY-MM-DD")
