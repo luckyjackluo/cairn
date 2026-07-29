@@ -24,6 +24,7 @@ from cairn_core import (
     bills,
     digest,
     lifecycle,
+    pulse,
     query,
     reco,
     retrieval,
@@ -407,6 +408,53 @@ def cmd_remind(args):
             print(f"  [{it['kind']:5}] {when:>11}  {it['title']}   ({it['path']})")
 
 
+def cmd_pulse(args):
+    out = pulse.project_pulse(
+        _ws(args), stale_after_days=args.stale_after_days,
+    )
+    projects = out["projects"]
+    if args.project:
+        projects = [p for p in projects if p["project"].lower() == args.project.lower()]
+    if args.json:
+        print(json.dumps({**out, "projects": projects}, ensure_ascii=False, indent=2))
+        return
+    if not projects:
+        print("(no projects found — notes need a `project:` field)")
+        return
+    print(f"Project pulse — as of {out['as_of']} (stale > {out['stale_after_days']}d)")
+    for p in projects:
+        idle = p["days_since_activity"]
+        idle_s = f"{idle}d idle" if idle is not None else "no dated activity"
+        flag = "  ⚠ overdue" if p["has_overdue"] else ("  … stale" if p["stale"] else "")
+        load = f"{p['tasks_open']} open"
+        if p["tasks_overdue"]:
+            load += f"/{p['tasks_overdue']} overdue"
+        if p["tasks_doing"]:
+            load += f"/{p['tasks_doing']} doing"
+        nd = f"  next {p['next_due']}" if p["next_due"] else ""
+        print(f"  {p['project']:20} {idle_s:>18}  {load:<22}{nd}{flag}")
+
+
+def cmd_refresh_dashboard(args):
+    ws = _ws(args)
+    if args.all or not args.project:
+        out = pulse.refresh_all_dashboards(ws, stale_after_days=args.stale_after_days)
+        results = out["refreshed"]
+    else:
+        results = [pulse.refresh_dashboard(ws, args.project, stale_after_days=args.stale_after_days)]
+    if args.json:
+        print(json.dumps(results if (args.all or not args.project) else results[0],
+                         ensure_ascii=False, indent=2))
+        return
+    for r in results:
+        if not r["updated"]:
+            reason = r.get("reason", "no change")
+            print(f"  {r['project']:20} skipped — {reason}")
+        else:
+            how = "inserted" if r.get("inserted") else "refreshed"
+            print(f"  {r['project']:20} {how} → {r['path']}")
+
+
 def cmd_serve(args):
     from .serve import serve
     serve(_ws(args), host=args.host, port=args.port, web_dir=args.web_dir)
@@ -534,6 +582,16 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--upcoming-days", dest="upcoming_days", type=int, default=3,
                     help="Flag items due within this many days (default: 3)")
     sp.add_argument("--preview", action="store_true", help="Show without consuming the reminder (no ledger write)")
+    sp = add("pulse", cmd_pulse, "Per-project momentum/health: open/overdue tasks, next due, days idle")
+    sp.add_argument("project", nargs="?", default="", help="Limit to one project (default: all)")
+    sp.add_argument("--stale-after-days", dest="stale_after_days", type=int, default=10,
+                    help="Flag a project stale after this many idle days (default: 10)")
+    sp = add("refresh-dashboard", cmd_refresh_dashboard,
+             "Write the computed Pulse block into projects/<name>.md (hand-written text untouched)")
+    sp.add_argument("project", nargs="?", default="", help="Project to refresh (omit or --all for every dashboard)")
+    sp.add_argument("--all", action="store_true", help="Refresh every existing projects/*.md")
+    sp.add_argument("--stale-after-days", dest="stale_after_days", type=int, default=10,
+                    help="Staleness threshold used in the block (default: 10)")
     sp = add("serve", cmd_serve, "Run the local HTTP API + web UI")
     sp.add_argument("--host", default="127.0.0.1"); sp.add_argument("--port", type=int, default=4177)
     sp.add_argument("--web-dir", help="Serve a static web UI from this directory (default: installed cairn-web)")

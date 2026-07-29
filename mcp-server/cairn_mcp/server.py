@@ -29,6 +29,7 @@ from cairn_core import (
     bills,
     digest,
     lifecycle,
+    pulse,
     query,
     reco,
     retrieval,
@@ -332,6 +333,59 @@ def reminder_digest(upcoming_days: int = 3, path: str = "", preview: bool = Fals
     the signal to stay quiet rather than deliver an empty reminder.
     """
     return _guard(lifecycle.reminder_digest, WS, None, upcoming_days, path, not preview)
+
+
+@mcp.tool(annotations=READ)
+def project_pulse(project: str = "", stale_after_days: int = 10) -> dict:
+    """Per-project momentum/health — the project-manager view of the workspace.
+
+    Where `attention` surfaces individual items, this steps up to the PROJECT:
+    for every `project:` value it derives open/overdue/in-progress/blocked task
+    counts, the next deadline, and days since anything in that project was last
+    touched (`days_since_activity`), flagging `stale` past `stale_after_days` and
+    `has_overdue`. Use it to answer "which projects are moving and which have
+    stalled?" without reading every note. Pass a `project` to get just that one.
+
+    Returns {as_of, stale_after_days, projects: [...]} sorted longest-idle first.
+    """
+    result = _guard(pulse.project_pulse, WS, None, stale_after_days)
+    if project:
+        result = {
+            **result,
+            "projects": [
+                p for p in result["projects"]
+                if p["project"].lower() == project.lower()
+            ],
+        }
+    return result
+
+
+@mcp.tool(annotations=READ)
+def stale_projects(threshold_days: int = 10) -> list:
+    """Just the stalled projects — a lean call for a daily-digest line.
+
+    Returns [{project, days_since_activity, tasks_open, tasks_overdue}] for every
+    project idle longer than `threshold_days`, longest-idle first. Empty list means
+    nothing has gone quiet — the signal to add no stale-projects line at all.
+    """
+    return _guard(pulse.stale_projects, WS, threshold_days)
+
+
+@mcp.tool(annotations=WRITE)
+def refresh_project_dashboard(project: str = "", all: bool = False, stale_after_days: int = 10) -> dict:
+    """Regenerate the computed Pulse block in a project's `projects/<name>.md`.
+
+    Writes momentum + open-task numbers into the dashboard between HTML-comment
+    markers, leaving every hand-written section untouched — so the "Last updated"
+    line stops going stale by hand. Pass a single `project`, or `all=true` to
+    refresh every existing `projects/*.md`. Never creates a dashboard: a missing
+    file is reported as `updated: false`, not an error.
+
+    Returns the per-project {project, path, updated, inserted, block}.
+    """
+    if all or not project:
+        return _guard(pulse.refresh_all_dashboards, WS, "projects", None, stale_after_days)
+    return _guard(pulse.refresh_dashboard, WS, project, "projects", None, stale_after_days)
 
 
 @mcp.tool(annotations=WRITE)
