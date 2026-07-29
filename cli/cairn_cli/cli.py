@@ -32,6 +32,7 @@ from cairn_core import (
     tags,
     tasks,
     templates,
+    waiting,
 )
 
 
@@ -427,6 +428,59 @@ def cmd_bill_settle(args):
         print(f"  {b['path']}  ({b['status']}, {b['outstanding']} left)")
 
 
+def cmd_waiting(args):
+    out = waiting.list_waiting(
+        _ws(args), person=args.person or None, state=args.status or "open",
+    )
+    if args.json:
+        print(json.dumps(out, ensure_ascii=False, indent=2))
+        return
+    if not out:
+        print("(not waiting on anything)")
+        return
+    for w in out:
+        age = f"{w['age_days']}d" if w["age_days"] is not None else "—"
+        flag = "  ⚠ overdue" if w["overdue"] else ""
+        due = f" (need by {w['due']})" if w["due"] else ""
+        print(f"[{(w['status'] or '?'):8}] {age:>5} waiting  {w['person'] or '?'}: "
+              f"{w['title']}{due}{flag}   ({w['path']})")
+
+
+def cmd_who_owes_me(args):
+    out = waiting.who_owes_me(_ws(args))
+    if args.json:
+        print(json.dumps(out, ensure_ascii=False, indent=2))
+        return
+    if not out:
+        print("(nobody owes you anything right now)")
+        return
+    for g in out:
+        oldest = f", oldest {g['oldest_age_days']}d" if g["oldest_age_days"] is not None else ""
+        print(f"  {g['person']:14} {g['count']} thing(s){oldest}")
+        for it in g["items"]:
+            print(f"      · {it['title']}")
+
+
+def cmd_waiting_add(args):
+    _emit(waiting.add_waiting(
+        _ws(args), args.what, args.person, due=args.due or None,
+        since=args.since or None, remind_every=args.remind_every or None, notes=args.notes,
+    ), args)
+
+
+def cmd_waiting_received(args):
+    rec = waiting.mark_received(_ws(args), args.path, when=args.when or None)
+    if args.json:
+        print(json.dumps(rec, ensure_ascii=False, indent=2))
+        return
+    print(f"✓ received: {rec['person'] or '?'} — {rec['title']}   ({rec['path']})")
+
+
+def cmd_waiting_drop(args):
+    rec = waiting.drop_waiting(_ws(args), args.path, when=args.when or None)
+    _emit(rec, args)
+
+
 def cmd_attention(args):
     out = lifecycle.attention(
         _ws(args),
@@ -657,6 +711,22 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--path", default="", help="Just this bill (default: all their open bills)")
     sp.add_argument("--waive", action="store_true", help="Write it off rather than record repayment")
     sp.add_argument("--when", default="", help="Settlement date (default: today)")
+    sp = add("waiting", cmd_waiting, "List what you're waiting on others for, longest wait first")
+    sp.add_argument("--person", default="", help="Only items you're waiting on this person for")
+    sp.add_argument("--status", default="", help="open (default) | closed | all")
+    sp = add("who-owes-me", cmd_who_owes_me, "Who owes you an action, rolled up by person")
+    sp = add("waiting-add", cmd_waiting_add, "Track something you're waiting on someone for")
+    sp.add_argument("person", help="Who owes it")
+    sp.add_argument("what", help="What they owe you")
+    sp.add_argument("--due", default="", help="Need-it-by date YYYY-MM-DD (optional)")
+    sp.add_argument("--since", default="", help="When the wait began (default: today)")
+    sp.add_argument("--remind-every", dest="remind_every", type=int, default=0,
+                    help="Nudge cadence in days (default: the kind's)")
+    sp.add_argument("--notes", default="", help="Body text")
+    sp = add("received", cmd_waiting_received, "Close a waiting item — they delivered")
+    sp.add_argument("path"); sp.add_argument("--when", default="", help="Received date (default: today)")
+    sp = add("drop-waiting", cmd_waiting_drop, "Stop waiting on something (close as dropped)")
+    sp.add_argument("path"); sp.add_argument("--when", default="", help="Date (default: today)")
     sp = add("attention", cmd_attention, "Everything waiting on you now: overdue, due, stale (all kinds)")
     sp.add_argument("path", nargs="?", default="", help="Limit to this subdirectory")
     sp.add_argument("--kind", default="", help="Restrict to kinds, e.g. 'task,bill' (default: all)")

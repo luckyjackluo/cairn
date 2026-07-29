@@ -119,6 +119,20 @@ KINDS: dict[str, KindSpec] = {
         template="bill",
         default_dir="personal/bills",
     ),
+    # Something delegated — a person owes you an action (a review, a reply, a
+    # deliverable). The actions analog of a bill. Ages from when you started
+    # waiting; nags every few days so a dropped ball surfaces before it's forgotten.
+    "waiting": KindSpec(
+        category="waiting",
+        open_statuses=("waiting",),
+        closed_statuses=("received", "dropped"),
+        due_field="due",
+        anchor_fields=("since", "created"),
+        stale_after_days=4,
+        remind_every_days=3,
+        template="waiting",
+        default_dir="waiting",
+    ),
 }
 
 

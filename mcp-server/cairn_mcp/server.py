@@ -37,6 +37,7 @@ from cairn_core import (
     tags,
     tasks,
     templates,
+    waiting,
 )
 
 # --- workspace bootstrap ---------------------------------------------------
@@ -332,6 +333,32 @@ def list_bills(status: str = "", person: str = "", path: str = "") -> list[dict]
 
 
 @mcp.tool(annotations=READ)
+def who_owes_me(path: str = "") -> dict:
+    """Who owes the user an ACTION, rolled up by person — the delegated-work view.
+
+    The actions analog of `who_owes` (which is money): open `waiting` items —
+    things the user delegated or is blocked on (a review, a reply, a deliverable) —
+    grouped per person you've waited on longest first: {person, count,
+    oldest_age_days, items}. An empty list means nothing is outstanding — stay
+    quiet rather than nudge. Add items with `add_waiting`; close with `mark_received`.
+    """
+    return _guard(waiting.who_owes_me, WS, None, path)
+
+
+@mcp.tool(annotations=READ)
+def list_waiting(person: str = "", state: str = "open", path: str = "") -> list[dict]:
+    """List waiting-on items (things others owe the user), longest wait first.
+
+    A `waiting` note is one person owing one action. `state` is "open" (still
+    waiting, default), "closed" (received/dropped), or "all". `person` filters
+    case-insensitively. Each record carries {person, title, status, since,
+    age_days, due, overdue}. These also surface in `attention`/`reminder_digest`
+    once they've been waiting past the kind's staleness threshold.
+    """
+    return _guard(waiting.list_waiting, WS, person or None, state, path)
+
+
+@mcp.tool(annotations=READ)
 def attention(kinds: list[str] | None = None, upcoming_days: int = 3, path: str = "") -> dict:
     """Everything across the workspace that is waiting on the user right now.
 
@@ -501,6 +528,37 @@ def add_person_to_bill(path: str, person: str, owes: str) -> dict:
     Does not re-split the bill: the others have already been told what they owe.
     """
     return _guard(bills.add_person, WS, path, person, owes)
+
+
+@mcp.tool(annotations=WRITE)
+def add_waiting(
+    what: str, person: str, due: str = "", since: str = "", remind_every: int = 0,
+    notes: str = "", dir: str = "waiting",
+) -> dict:
+    """Start tracking something the user is waiting on `person` for (a delegated action).
+
+    `what` is the thing owed (a review, a reply, a deliverable); `person` is who
+    owes it. `since` defaults to today (when the wait began); `due` is an optional
+    "need it by" (YYYY-MM-DD) that makes it overdue past that date; `remind_every`
+    overrides the nudge cadence in days. The item ages from `since` and surfaces in
+    the daily digest once it's been outstanding a few days.
+    """
+    return _guard(
+        waiting.add_waiting, WS, what, person, due or None, since or None,
+        remind_every or None, notes, dir,
+    )
+
+
+@mcp.tool(annotations=WRITE)
+def mark_received(path: str, when: str = "") -> dict:
+    """Close a waiting item because they delivered — stamps `received` (today by default)."""
+    return _guard(waiting.mark_received, WS, path, when or None)
+
+
+@mcp.tool(annotations=WRITE)
+def drop_waiting(path: str, when: str = "") -> dict:
+    """Stop waiting on something — close the item as `dropped` (the user gave up on it)."""
+    return _guard(waiting.drop_waiting, WS, path, when or None)
 
 
 @mcp.tool(annotations=WRITE)

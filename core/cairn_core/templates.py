@@ -68,6 +68,24 @@ _BUILTINS: dict[str, str] = {
         "---\n\n"
         "{notes}\n"
     ),
+    # Something you're waiting on someone else for — a delegated action. One
+    # person, one thing; ``since`` anchors how long you've waited, ``due`` is an
+    # optional "need it by". The waiting layer (:mod:`cairn_core.waiting`) gives
+    # the who-owes-me view; status is waiting | received | dropped.
+    "waiting": (
+        "---\n"
+        "title: {title}\n"
+        "category: waiting\n"
+        "status: {status}\n"
+        "person: {person}\n"
+        "since: {since}\n"
+        "due: {due}\n"
+        "remind_every: {remind_every}\n"
+        "created: {date}\n"
+        "tags: [{tags}]\n"
+        "---\n\n"
+        "{notes}\n"
+    ),
     # A shared bill you fronted. ``people`` holds flat ``name:amount:state``
     # triples so the frontmatter parser can read them and a human can still edit
     # them by hand; the bill layer (:mod:`cairn_core.bills`) derives the
@@ -93,6 +111,7 @@ _DEFAULTS: dict[str, dict[str, str]] = {
     "note": {"status": "draft"},
     "paper": {"status": "to-read"},
     "task": {"status": "todo", "tags": "task"},
+    "waiting": {"status": "waiting", "tags": "waiting"},
     "bill": {"status": "open", "tags": "bill", "currency": "USD"},
 }
 
