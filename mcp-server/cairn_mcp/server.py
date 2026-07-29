@@ -217,27 +217,51 @@ def add_task(
     notes: str = "",
     status: str = "todo",
     dir: str = "tasks",
+    priority: str = "",
+    blocked_by: str = "",
+    recur: str = "",
 ) -> dict:
     """Create a task (a `category: task` note) and return its record.
 
     Files into `dir` (default `tasks/`) with a slug from `title`. `due` is
     YYYY-MM-DD; `context` is a tag like "@errand"; `status` is
-    todo/doing/blocked/done. Colliding names get a numeric suffix, never clobber.
+    todo/doing/blocked/done. `priority` is p1/p2/p3. `blocked_by` is a
+    space/comma-separated list of task slugs (a task's slug is its filename stem)
+    that must finish before this one becomes actionable. `recur` makes it
+    recurring (daily/weekly/monthly/yearly/biweekly or `<N><d|w|m|y>`): completing
+    it rolls the task forward to its next due date instead of archiving it.
+    Colliding names get a numeric suffix, never clobber.
     """
     return _guard(
         tasks.add_task, WS, title, due or None, project or None,
-        context or None, notes, status, None, dir,
+        context or None, notes, status, None, dir, "",
+        priority or None, blocked_by or None, recur or None,
     )
 
 
 @mcp.tool(annotations=WRITE)
 def complete_task(path: str, when: str = "") -> dict:
-    """Mark a task done, stamping a `completed` date (defaults to today).
+    """Complete a task (surgical frontmatter edit), stamping `completed` (today by default).
 
-    Surgical: only `status` and `completed` are rewritten; the rest of the file
-    is preserved byte-for-byte.
+    A one-off task is marked `done`; its result gains `unblocked` — the tasks it
+    was blocking that are now actionable. A **recurring** task (one with a `recur`
+    cadence) is instead rolled forward in place: status back to `todo`, `due`
+    advanced to the next occurrence, and the result carries
+    `recurred: {next_due, occurrences}`. The rest of the file is preserved.
     """
     return _guard(tasks.complete_task, WS, path, when or None)
+
+
+@mcp.tool(annotations=READ)
+def next_actions(project: str = "", limit: int = 0) -> list:
+    """The actionable tasks right now — open, unblocked — best-first.
+
+    Answers "what should I work on next?": excludes done, manually blocked, and
+    anything still waiting on an open `blocked_by` dependency, then ranks by
+    urgency — overdue first, then priority (p1>p2>p3), then soonest due. Pass
+    `project` to scope it, `limit` to cap the list (0 = no cap).
+    """
+    return _guard(tasks.next_actions, WS, project or None, "", None, limit or None)
 
 
 @mcp.tool(annotations=WRITE)
@@ -247,15 +271,23 @@ def update_task(
     due: str = "",
     project: str = "",
     context: str = "",
+    priority: str = "",
+    blocked_by: str = "",
+    recur: str = "",
 ) -> dict:
     """Update one or more fields of a task in place (surgical frontmatter edit).
 
-    Pass only the fields to change. `status` must be todo/doing/blocked/done;
-    `due` is YYYY-MM-DD; `context` is a tag like "@deep".
+    Pass only the fields to change; an empty argument leaves that field untouched.
+    `status` must be todo/doing/blocked/done; `due` is YYYY-MM-DD; `context` is a
+    tag like "@deep"; `priority` is p1/p2/p3; `blocked_by` replaces the dependency
+    list (space/comma-separated task slugs); `recur` sets the recurrence cadence.
     """
     return _guard(
         tasks.update_task, WS, path, status or None, due or None,
         project or None, context or None,
+        priority if priority else None,
+        blocked_by if blocked_by else None,
+        recur if recur else None,
     )
 
 

@@ -264,27 +264,64 @@ def cmd_tasks(args):
         print("(no tasks)")
         return
     for t in out:
-        flag = "  ⚠ overdue" if t["overdue"] else ("  ● today" if t["today"] else "")
-        meta = " ".join(x for x in [f"+{t['project']}" if t["project"] else "", t["context"] or ""] if x)
-        print(f"[{(t['status'] or '?'):6}] {(t['due'] or '—'):>10}  {t['title']}"
-              f"{('  ' + meta) if meta else ''}{flag}   ({t['path']})")
+        print(_task_line(t))
+
+
+def _task_line(t: dict) -> str:
+    flag = "  ⚠ overdue" if t["overdue"] else ("  ● today" if t["today"] else "")
+    if t.get("blocked"):
+        flag += "  🔒 blocked"
+    marks = "".join([
+        f"{t['priority'].upper()} " if t.get("priority") else "",
+        "🔁 " if t.get("recur") else "",
+    ])
+    meta = " ".join(x for x in [f"+{t['project']}" if t["project"] else "", t["context"] or ""] if x)
+    return (f"[{(t['status'] or '?'):6}] {(t['due'] or '—'):>10}  {marks}{t['title']}"
+            f"{('  ' + meta) if meta else ''}{flag}   ({t['path']})")
+
+
+def cmd_next(args):
+    out = tasks.next_actions(
+        _ws(args), project=args.project or None, limit=args.limit or None,
+    )
+    if args.json:
+        print(json.dumps(out, ensure_ascii=False, indent=2))
+        return
+    if not out:
+        print("(nothing actionable — all done, blocked, or waiting on dependencies)")
+        return
+    for t in out:
+        print(_task_line(t))
 
 
 def cmd_task_add(args):
     _emit(tasks.add_task(
         _ws(args), args.title, due=args.due or None, project=args.project or None,
         context=args.context or None, notes=args.notes, status=args.status, dir=args.dir,
+        priority=args.priority or None, blocked_by=args.blocked_by or None,
+        recur=args.recur or None,
     ), args)
 
 
 def cmd_task_done(args):
-    _emit(tasks.complete_task(_ws(args), args.path, when=args.when or None), args)
+    rec = tasks.complete_task(_ws(args), args.path, when=args.when or None)
+    if args.json:
+        print(json.dumps(rec, ensure_ascii=False, indent=2))
+        return
+    if rec.get("recurred"):
+        print(f"🔁 recurred → next due {rec['recurred']['next_due']} "
+              f"(occurrence #{rec['recurred']['occurrences']})   ({rec['path']})")
+    else:
+        print(f"✓ done: {rec['title']}   ({rec['path']})")
+        for u in rec.get("unblocked", []):
+            print(f"   ↳ unblocked: {u['title']}   ({u['path']})")
 
 
 def cmd_task_update(args):
     _emit(tasks.update_task(
         _ws(args), args.path, status=args.status or None, due=args.due or None,
         project=args.project or None, context=args.context or None,
+        priority=args.priority, blocked_by=args.blocked_by, recur=args.recur,
     ), args)
 
 
@@ -531,20 +568,31 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--project", default="", help="Filter by project")
     sp.add_argument("--context", default="", help="Filter by context, e.g. @errand")
     sp.add_argument("--due-before", dest="due_before", default="", help="Only tasks due before YYYY-MM-DD")
+    sp = add("next", cmd_next, "Next actions: open, unblocked tasks ranked overdue→priority→due")
+    sp.add_argument("--project", default="", help="Scope to one project")
+    sp.add_argument("--limit", type=int, default=0, help="Cap the list (0 = no cap)")
     sp = add("task-add", cmd_task_add, "Create a task")
     sp.add_argument("title")
     sp.add_argument("--due", default="", help="Due date YYYY-MM-DD")
     sp.add_argument("--project", default="")
     sp.add_argument("--context", default="", help="e.g. @deep")
     sp.add_argument("--status", default="todo", help="todo | doing | blocked | done")
+    sp.add_argument("--priority", default="", help="p1 | p2 | p3")
+    sp.add_argument("--blocked-by", dest="blocked_by", default="",
+                    help="Task slugs that must finish first (space/comma-separated)")
+    sp.add_argument("--recur", default="", help="daily|weekly|monthly|yearly|biweekly or e.g. 3d, 2w")
     sp.add_argument("--notes", default="", help="Body text")
     sp.add_argument("--dir", default="tasks", help="Folder to file into (default: tasks)")
-    sp = add("task-done", cmd_task_done, "Mark a task done")
+    sp = add("task-done", cmd_task_done, "Complete a task (recurring tasks roll forward)")
     sp.add_argument("path"); sp.add_argument("--when", default="", help="Completion date (default: today)")
     sp = add("task-update", cmd_task_update, "Update a task's fields in place")
     sp.add_argument("path")
     sp.add_argument("--status", default=""); sp.add_argument("--due", default="")
     sp.add_argument("--project", default=""); sp.add_argument("--context", default="")
+    sp.add_argument("--priority", default=None, help="p1|p2|p3, or '' to clear")
+    sp.add_argument("--blocked-by", dest="blocked_by", default=None,
+                    help="Replace dependency list (space/comma slugs; '' to clear)")
+    sp.add_argument("--recur", default=None, help="Set recurrence cadence, or '' to clear")
     sp = add("harvest", cmd_harvest, "Promote '- [ ]' checkbox lines in notes into task files")
     sp.add_argument("path", nargs="?", default="", help="File or folder to scan (default: whole workspace)")
     sp.add_argument("--dir", default="tasks", help="Folder to file harvested tasks into")
