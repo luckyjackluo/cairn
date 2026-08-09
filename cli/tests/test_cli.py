@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import threading
 import urllib.request
+from importlib.metadata import version
 
 import pytest
 
@@ -41,6 +42,14 @@ def test_cli_tree_and_move(tmp_path, capsys):
 def test_cli_error_exits(tmp_path):
     with pytest.raises(SystemExit):
         main(["-w", str(tmp_path), "read", "missing.uni"])
+
+
+def test_cli_version(capsys):
+    with pytest.raises(SystemExit) as excinfo:
+        main(["--version"])
+
+    assert excinfo.value.code == 0
+    assert capsys.readouterr().out.strip() == f"cairn {version('cairn-cli')}"
 
 
 def test_http_api(tmp_path):

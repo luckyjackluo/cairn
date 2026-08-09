@@ -11,6 +11,7 @@ Dependency-free (standard library only), like the core it wraps.
 from __future__ import annotations
 
 import argparse
+from importlib.metadata import version
 import json
 import os
 import sys
@@ -601,6 +602,7 @@ def cmd_mcp(args):
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="cairn", description="Local-first file-organization harness CLI")
+    p.add_argument("--version", action="version", version=f"cairn {version('cairn-cli')}")
     p.add_argument("--workspace", "-w", help="Workspace directory (default: $CAIRN_WORKSPACE or CWD)")
     p.add_argument("--json", action="store_true", help="Emit JSON instead of human-readable output")
     sub = p.add_subparsers(dest="command", required=True)
