@@ -11,11 +11,14 @@ Dependency-free (standard library only), like the core it wraps.
 from __future__ import annotations
 
 import argparse
+from importlib.metadata import PackageNotFoundError, version
 import json
 import os
+from pathlib import Path
 import sys
 from typing import Any
 
+from . import __version__
 from cairn_core import (
     FileError,
     FileService,
@@ -34,6 +37,22 @@ from cairn_core import (
     templates,
     waiting,
 )
+
+
+def _cli_version() -> str:
+    try:
+        return version("cairn-cli")
+    except PackageNotFoundError:
+        pyproject = Path(__file__).resolve().parents[1] / "pyproject.toml"
+        try:
+            lines = pyproject.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            return __version__
+        for line in lines:
+            key, _, value = line.partition("=")
+            if key.strip() == "version":
+                return value.strip().strip('"')
+        return __version__
 
 
 def _ws(args) -> Workspace:
@@ -601,6 +620,7 @@ def cmd_mcp(args):
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="cairn", description="Local-first file-organization harness CLI")
+    p.add_argument("--version", action="version", version=f"cairn {_cli_version()}")
     p.add_argument("--workspace", "-w", help="Workspace directory (default: $CAIRN_WORKSPACE or CWD)")
     p.add_argument("--json", action="store_true", help="Emit JSON instead of human-readable output")
     sub = p.add_subparsers(dest="command", required=True)
