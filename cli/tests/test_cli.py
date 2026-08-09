@@ -9,6 +9,7 @@ from importlib.metadata import version
 
 import pytest
 
+import cairn_cli.cli as cli
 from cairn_cli.cli import main
 from cairn_cli.serve import _Server, _make_handler
 from cairn_core import Workspace
@@ -50,6 +51,19 @@ def test_cli_version(capsys):
 
     assert excinfo.value.code == 0
     assert capsys.readouterr().out.strip() == f"cairn {version('cairn-cli')}"
+
+
+def test_cli_version_falls_back_without_package_metadata(capsys, monkeypatch):
+    def missing_metadata(_name):
+        raise cli.PackageNotFoundError
+
+    monkeypatch.setattr(cli, "version", missing_metadata)
+
+    with pytest.raises(SystemExit) as excinfo:
+        main(["--version"])
+
+    assert excinfo.value.code == 0
+    assert capsys.readouterr().out.strip() == "cairn 0.3.1"
 
 
 def test_http_api(tmp_path):
