@@ -183,6 +183,16 @@ def test_digest_by_tag_repeats_entry(fs):
     assert d["x"][0]["title"] == "M" and d["y"][0]["title"] == "M"
 
 
+def test_digest_sorts_mixed_date_formats_and_keeps_undated_last(fs):
+    fs.create_file("", "iso.md", "---\ntitle: ISO\ndate: 2026-07-18\n---\nbody")
+    fs.create_file("", "long.md", "---\ntitle: Long\ndate: July 17, 2026\n---\nbody")
+    fs.create_file("", "slash.md", "---\ntitle: Slash\ndate: 07/19/2026\n---\nbody")
+    fs.create_file("", "text.md", "---\ntitle: Text\ndate: someday\n---\nbody")
+    fs.create_file("", "missing.md", "---\ntitle: Missing\n---\nbody")
+    d = digest.build_digest(fs.ws, group_by="folder")
+    assert [e["title"] for e in d["."]] == ["Long", "ISO", "Slash", "Text", "Missing"]
+
+
 def test_paper_template_end_to_end(fs):
     ws = fs.ws
     fs.create_file(

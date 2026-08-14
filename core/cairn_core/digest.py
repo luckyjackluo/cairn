@@ -9,6 +9,7 @@ scalable replacement for a hand-kept ``_INDEX.md``.
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +19,15 @@ from .query import doc_meta
 from .workspace import Workspace
 
 _SUMMARY_CHARS = 160
+
+_COMMON_DATE_FORMATS = (
+    "%Y-%m-%d",
+    "%Y/%m/%d",
+    "%m/%d/%Y",
+    "%m-%d-%Y",
+    "%B %d, %Y",
+    "%b %d, %Y",
+)
 
 
 def _body_summary(p: Path) -> str:
@@ -55,6 +65,18 @@ def _entry(ws: Workspace, p: Path, meta: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _date_sort_key(value: Any) -> tuple[int, str]:
+    raw = str(value).strip() if value not in (None, "") else ""
+    if not raw:
+        return (2, "")
+    for fmt in _COMMON_DATE_FORMATS:
+        try:
+            return (0, datetime.strptime(raw, fmt).date().isoformat())
+        except ValueError:
+            continue
+    return (1, raw.casefold())
+
+
 def build_digest(
     ws: Workspace, path: str = "", group_by: str = "folder"
 ) -> dict[str, list[dict[str, Any]]]:
@@ -90,6 +112,6 @@ def build_digest(
             groups.setdefault(key, []).append(entry)
 
     return {
-        g: sorted(entries, key=lambda e: (e.get("date") or "", e["path"]))
+        g: sorted(entries, key=lambda e: (*_date_sort_key(e.get("date")), e["path"]))
         for g, entries in sorted(groups.items())
     }
