@@ -167,7 +167,7 @@ def cmd_tag(args):
 
 
 def cmd_tags(args):
-    _emit(tags.get_tag_tree(_ws(args)), args)
+    _emit(tags.get_tag_tree(_ws(args), args.path), args)
 
 
 def cmd_query(args):
@@ -634,7 +634,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp = add("find", cmd_find, "Search file names"); sp.add_argument("query"); sp.add_argument("path", nargs="?", default="")
     sp = add("tag", cmd_tag, "Get or set tags on a .uni file")
     sp.add_argument("path"); sp.add_argument("tags", nargs="*")
-    add("tags", cmd_tags, "Show the workspace tag tree")
+    sp = add("tags", cmd_tags, "Show the workspace tag tree")
+    sp.add_argument("--path", default="", help="Limit the tag tree to this subdirectory")
     sp = add("query", cmd_query, "Find docs by metadata, e.g. query status=to-read project=amazon")
     sp.add_argument("filters", nargs="+", help="key=value filters (matched on .uni fields or .md frontmatter)")
     sp.add_argument("--path", default="", help="Limit the search to this subdirectory")
