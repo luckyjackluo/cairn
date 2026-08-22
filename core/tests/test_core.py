@@ -126,6 +126,20 @@ def test_tag_tree_spans_uni_and_markdown(fs):
     assert tree["mdonly"] == ["b.md"]
 
 
+def test_tag_tree_respects_path_scope(fs):
+    ws = fs.ws
+    ws.resolve("papers").mkdir()
+    ws.resolve("notes").mkdir()
+    fs.create_file("papers", "paper.md", "---\ntags: [shared, papers]\n---\nbody")
+    fs.create_file("notes", "note.md", "---\ntags: [shared, notes]\n---\nbody")
+
+    tree = tags.get_tag_tree(ws, "papers")
+
+    assert set(tree) == {"papers", "shared"}
+    assert tree["papers"] == ["papers/paper.md"]
+    assert tree["shared"] == ["papers/paper.md"]
+
+
 def test_find_by_meta_scalar_and_tag(fs):
     ws = fs.ws
     fs.create_file("", "p1.md", "---\nstatus: to-read\nproject: amazon\ntags: [tgn]\n---\na")

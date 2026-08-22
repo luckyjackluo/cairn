@@ -104,9 +104,9 @@ def get_file_tags(path: str) -> list[str]:
 
 
 @mcp.tool(annotations=READ)
-def get_tag_tree() -> dict:
+def get_tag_tree(path: str = "") -> dict:
     """Return {tag: [file paths]} aggregated across the workspace."""
-    return _guard(tags.get_tag_tree, WS)
+    return _guard(tags.get_tag_tree, WS, path)
 
 
 @mcp.tool(annotations=READ)

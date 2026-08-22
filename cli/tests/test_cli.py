@@ -38,6 +38,23 @@ def test_cli_tree_and_move(tmp_path, capsys):
     assert json.loads(out)[0]["name"] == "x.uni"
 
 
+def test_cli_tags_path_scope(tmp_path, capsys):
+    w = ["-w", str(tmp_path)]
+    run(capsys, [*w, "mkdir", "papers"])
+    run(capsys, [*w, "mkdir", "notes"])
+    run(capsys, [*w, "create", "papers/paper.uni", "paper"])
+    run(capsys, [*w, "create", "notes/note.uni", "note"])
+    run(capsys, [*w, "tag", "papers/paper.uni", "shared", "papers"])
+    run(capsys, [*w, "tag", "notes/note.uni", "shared", "notes"])
+
+    out = run(capsys, [*w, "--json", "tags", "--path", "papers"])
+
+    assert json.loads(out) == {
+        "papers": ["papers/paper.uni"],
+        "shared": ["papers/paper.uni"],
+    }
+
+
 def test_cli_error_exits(tmp_path):
     with pytest.raises(SystemExit):
         main(["-w", str(tmp_path), "read", "missing.uni"])

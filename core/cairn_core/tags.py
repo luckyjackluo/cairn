@@ -68,13 +68,14 @@ def _tags_of(p) -> list[str]:
     return []
 
 
-def get_tag_tree(ws: Workspace) -> dict[str, list[str]]:
+def get_tag_tree(ws: Workspace, path: str = "") -> dict[str, list[str]]:
     """Return ``{tag: [file paths]}`` aggregated across the workspace.
 
     Covers both ``.uni`` documents and frontmatter-tagged text files.
     """
+    root = ws.resolve(path)
     tree: dict[str, list[str]] = {}
-    for p in ws.root.rglob("*"):
+    for p in root.rglob("*"):
         if not p.is_file():
             continue
         if any(part.startswith(".") for part in p.relative_to(ws.root).parts):
