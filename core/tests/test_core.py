@@ -214,6 +214,36 @@ def test_note_template_defaults_status(fs):
     assert fs.read_detail("n.md")["metadata"]["status"] == "draft"
 
 
+def test_daily_and_meeting_templates_render_frontmatter(fs):
+    fs.create_file(
+        "journal",
+        "2026-07-17.md",
+        template="daily",
+        fields={"title": "2026-07-17", "date": "2026-07-17"},
+    )
+    fs.create_file(
+        "meetings",
+        "sync.md",
+        template="meeting",
+        fields={"title": "Team Sync", "attendees": ["Alex", "Bea"]},
+    )
+
+    daily = fs.read_detail("journal/2026-07-17.md")
+    assert daily["metadata"]["category"] == "daily"
+    assert daily["metadata"]["date"] == "2026-07-17"
+    assert daily["metadata"]["status"] == "draft"
+    assert daily["tags"] == ["daily"]
+    assert "## Today" in daily["text"]
+
+    meeting = fs.read_detail("meetings/sync.md")
+    assert meeting["metadata"]["category"] == "meeting"
+    assert meeting["metadata"]["status"] == "draft"
+    assert meeting["metadata"]["attendees"] == ["Alex", "Bea"]
+    assert meeting["tags"] == ["meeting"]
+    assert "## Agenda" in meeting["text"]
+    assert "## Action Items" in meeting["text"]
+
+
 def test_unknown_template_errors(fs):
     with pytest.raises(ValueError, match="Unknown template"):
         fs.create_file("", "x.md", template="nope")

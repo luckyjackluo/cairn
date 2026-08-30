@@ -5,8 +5,9 @@ its metadata pre-filled, so a captured arXiv link starts life as a well-formed
 read-later note instead of a bare URL. Templates are plain text with ``{field}``
 placeholders; unknown placeholders resolve to empty strings.
 
-Two built-ins ship (``note`` and ``paper``); a workspace can add or override any
-template by dropping ``<workspace>/.cairn/templates/<name>.md`` on disk.
+Built-ins ship for notes, papers, and common capture flows; a workspace can add
+or override any template by dropping ``<workspace>/.cairn/templates/<name>.md``
+on disk.
 """
 
 from __future__ import annotations
@@ -46,6 +47,33 @@ _BUILTINS: dict[str, str] = {
         "## Abstract\n{abstract}\n\n"
         "## Why I saved it\n{why}\n\n"
         "## My Notes\n{notes}\n"
+    ),
+    "daily": (
+        "---\n"
+        "title: {title}\n"
+        "date: {date}\n"
+        "category: daily\n"
+        "project: {project}\n"
+        "tags: [{tags}]\n"
+        "status: {status}\n"
+        "---\n\n"
+        "## Top of mind\n{top_of_mind}\n\n"
+        "## Today\n{today}\n\n"
+        "## Notes\n{notes}\n"
+    ),
+    "meeting": (
+        "---\n"
+        "title: {title}\n"
+        "date: {date}\n"
+        "category: meeting\n"
+        "project: {project}\n"
+        "attendees: [{attendees}]\n"
+        "tags: [{tags}]\n"
+        "status: {status}\n"
+        "---\n\n"
+        "## Agenda\n{agenda}\n\n"
+        "## Notes\n{notes}\n\n"
+        "## Action Items\n{action_items}\n"
     ),
     # A task is just a note with a lifecycle. Because it's frontmatter-native it
     # drops straight into find_by_meta / digest_workspace; the task layer
@@ -110,6 +138,8 @@ _BUILTINS: dict[str, str] = {
 _DEFAULTS: dict[str, dict[str, str]] = {
     "note": {"status": "draft"},
     "paper": {"status": "to-read"},
+    "daily": {"status": "draft", "tags": "daily"},
+    "meeting": {"status": "draft", "tags": "meeting"},
     "task": {"status": "todo", "tags": "task"},
     "waiting": {"status": "waiting", "tags": "waiting"},
     "bill": {"status": "open", "tags": "bill", "currency": "USD"},
