@@ -225,7 +225,7 @@ def test_daily_and_meeting_templates_render_frontmatter(fs):
         "meetings",
         "sync.md",
         template="meeting",
-        fields={"title": "Team Sync", "attendees": ["Alex", "Bea"]},
+        fields={"title": "Team Sync", "attendees": ["Doe, Jane", "Smith, John"]},
     )
 
     daily = fs.read_detail("journal/2026-07-17.md")
@@ -238,7 +238,7 @@ def test_daily_and_meeting_templates_render_frontmatter(fs):
     meeting = fs.read_detail("meetings/sync.md")
     assert meeting["metadata"]["category"] == "meeting"
     assert meeting["metadata"]["status"] == "draft"
-    assert meeting["metadata"]["attendees"] == ["Alex", "Bea"]
+    assert meeting["metadata"]["attendees"] == ["Doe, Jane", "Smith, John"]
     assert meeting["tags"] == ["meeting"]
     assert "## Agenda" in meeting["text"]
     assert "## Action Items" in meeting["text"]

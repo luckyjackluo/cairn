@@ -157,7 +157,13 @@ def _today() -> str:
 
 def _flatten(value: Any) -> str:
     if isinstance(value, (list, tuple)):
-        return ", ".join(str(v) for v in value)
+        items = []
+        for item in value:
+            text = str(item)
+            if "," in text:
+                text = '"' + text.replace('"', '\\"') + '"'
+            items.append(text)
+        return ", ".join(items)
     return str(value)
 
 
