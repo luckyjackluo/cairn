@@ -56,8 +56,37 @@ def _split(text: str) -> tuple[list[str], str] | None:
 def _unquote(s: str) -> str:
     s = s.strip()
     if len(s) >= 2 and s[0] == s[-1] and s[0] in ("'", '"'):
-        return s[1:-1]
+        value = s[1:-1]
+        return value.replace('\\"', '"') if s[0] == '"' else value
     return s
+
+
+def _split_inline_list(inner: str) -> list[str]:
+    parts: list[str] = []
+    current: list[str] = []
+    quote: str | None = None
+    escaped = False
+    for char in inner:
+        if escaped:
+            current.append(char)
+            escaped = False
+        elif quote == '"' and char == "\\":
+            current.append(char)
+            escaped = True
+        elif quote is not None:
+            current.append(char)
+            if char == quote:
+                quote = None
+        elif char in ("'", '"'):
+            current.append(char)
+            quote = char
+        elif char == ",":
+            parts.append("".join(current))
+            current = []
+        else:
+            current.append(char)
+    parts.append("".join(current))
+    return parts
 
 
 def _parse_scalar(raw: str) -> Any:
@@ -66,7 +95,7 @@ def _parse_scalar(raw: str) -> Any:
         inner = raw[1:-1].strip()
         if not inner:
             return []
-        return [_unquote(p) for p in inner.split(",") if p.strip()]
+        return [_unquote(p) for p in _split_inline_list(inner) if p.strip()]
     return _unquote(raw)
 
 
