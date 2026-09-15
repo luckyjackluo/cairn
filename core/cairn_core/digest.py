@@ -10,6 +10,7 @@ scalable replacement for a hand-kept ``_INDEX.md``.
 from __future__ import annotations
 
 from pathlib import Path
+from datetime import date, datetime
 from typing import Any
 
 from . import frontmatter, uni
@@ -18,6 +19,24 @@ from .query import doc_meta
 from .workspace import Workspace
 
 _SUMMARY_CHARS = 160
+
+
+def _date_key(value: Any) -> tuple[int, str]:
+    """Return a deterministic chronological key for common date formats."""
+    if value in (None, ""):
+        return (1, "")
+    raw = str(value).strip()
+    for parser in (date.fromisoformat, datetime.fromisoformat):
+        try:
+            return (0, parser(raw).isoformat())
+        except ValueError:
+            pass
+    for fmt in ("%B %d, %Y", "%b %d, %Y", "%m/%d/%Y"):
+        try:
+            return (0, datetime.strptime(raw, fmt).date().isoformat())
+        except ValueError:
+            pass
+    return (1, raw)
 
 
 def _body_summary(p: Path) -> str:
@@ -90,6 +109,6 @@ def build_digest(
             groups.setdefault(key, []).append(entry)
 
     return {
-        g: sorted(entries, key=lambda e: (e.get("date") or "", e["path"]))
+        g: sorted(entries, key=lambda e: (_date_key(e.get("date")), e["path"]))
         for g, entries in sorted(groups.items())
     }
