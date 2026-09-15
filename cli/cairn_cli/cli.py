@@ -14,6 +14,8 @@ import argparse
 import json
 import os
 import sys
+
+from . import __version__
 from typing import Any
 
 from cairn_core import (
@@ -601,6 +603,7 @@ def cmd_mcp(args):
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="cairn", description="Local-first file-organization harness CLI")
+    p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     p.add_argument("--workspace", "-w", help="Workspace directory (default: $CAIRN_WORKSPACE or CWD)")
     p.add_argument("--json", action="store_true", help="Emit JSON instead of human-readable output")
     sub = p.add_subparsers(dest="command", required=True)
